@@ -2,8 +2,9 @@ import { useEffect, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { X, Trash2 } from "lucide-react";
 import { useStore } from "../store/store";
-import type { CalEvent, EventKind, UserId, Visibility } from "../data/types";
+import type { CalEvent, EventCategory, EventKind, UserId, Visibility } from "../data/types";
 import { ALL_USERS, USER_LIST } from "../data/users";
+import { CATEGORIES } from "../lib/eventCategories";
 
 interface Props {
   /** Fecha ISO pre-cargada al crear */
@@ -20,6 +21,7 @@ export function EventModal({ initialDate, initialTime, event, onClose }: Props) 
 
   const [title, setTitle] = useState(event?.title ?? "");
   const [kind, setKind] = useState<EventKind>(event?.kind ?? "evento");
+  const [category, setCategory] = useState<EventCategory | undefined>(event?.category);
   const [date, setDate] = useState(event?.date ?? initialDate ?? "");
   const [start, setStart] = useState(event?.start ?? initialTime ?? "09:00");
   const [end, setEnd] = useState(event?.end ?? "");
@@ -52,6 +54,7 @@ export function EventModal({ initialDate, initialTime, event, onClose }: Props) 
     const payload = {
       title: title.trim(),
       kind,
+      category,
       date,
       start: allDay ? "00:00" : start,
       end: allDay ? undefined : (end || undefined),
@@ -129,6 +132,32 @@ export function EventModal({ initialDate, initialTime, event, onClose }: Props) 
                 {k === "evento" ? "Evento" : "Reunión"}
               </button>
             ))}
+          </div>
+
+          {/* Categoría */}
+          <div className="mb-4">
+            <div className="uppercase-label text-[var(--text-faint)] mb-2">Categoría</div>
+            <div className="flex gap-2 flex-wrap">
+              {CATEGORIES.map((c) => {
+                const Icon = c.icon;
+                const active = category === c.id;
+                return (
+                  <button
+                    key={c.id}
+                    onClick={() => setCategory(active ? undefined : c.id)}
+                    className="flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs transition-all"
+                    style={{
+                      borderColor: active ? c.color : "var(--border)",
+                      background: active ? `${c.color}22` : "transparent",
+                      color: active ? c.color : "var(--text-dim)",
+                    }}
+                  >
+                    <Icon size={12} />
+                    {c.label}
+                  </button>
+                );
+              })}
+            </div>
           </div>
 
           {/* Toggle todo el día */}

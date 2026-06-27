@@ -55,6 +55,7 @@ export function rowToEvent(r: any, m: ProfileMap): CalEvent {
     id: r.id,
     title: r.title,
     kind: r.kind,
+    category: r.category ?? undefined,
     date: r.date,
     start: r.start_time,
     end: r.end_time ?? undefined,
@@ -71,6 +72,7 @@ export function eventToRow(e: Partial<CalEvent>, m: ProfileMap) {
   if (e.id !== undefined) row.id = e.id;
   if (e.title !== undefined) row.title = e.title;
   if (e.kind !== undefined) row.kind = e.kind;
+  if (e.category !== undefined) row.category = e.category ?? null;
   if (e.date !== undefined) row.date = e.date;
   if (e.start !== undefined) row.start_time = e.start;
   if (e.end !== undefined) row.end_time = e.end ?? null;

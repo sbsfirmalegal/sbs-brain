@@ -21,6 +21,7 @@ import { iso } from "../lib/dates";
 import { visibilityLevel, VisibilityBadge, AvatarStack } from "../components/ui";
 import { EventModal } from "../components/EventModal";
 import { MiniCalendar } from "../components/MiniCalendar";
+import { getCategory } from "../lib/eventCategories";
 import type { CalEvent } from "../data/types";
 
 type View = "dia" | "semana" | "mes";
@@ -305,18 +306,22 @@ function MonthView({
                 </button>
               </div>
               <div className="space-y-1">
-                {evs.slice(0, 3).map((e) =>
-                  e.allDay ? (
+                {evs.slice(0, 3).map((e) => {
+                  const cat = getCategory(e.category);
+                  return e.allDay ? (
                     <button
                       key={e.id}
                       onClick={(ev) => {
                         ev.stopPropagation();
                         onEditEvent(e);
                       }}
-                      className="block w-full truncate rounded px-1.5 py-0.5 text-[10px] font-medium text-left text-[#0A1828] hover:brightness-110 transition-all"
+                      className="flex items-center gap-1 w-full truncate rounded px-1.5 py-0.5 text-[10px] font-medium text-left text-[#0A1828] hover:brightness-110 transition-all"
                       style={{ background: visColor(e) }}
                     >
-                      {e.title}
+                      {cat && (
+                        <cat.icon size={9} className="shrink-0" strokeWidth={2.5} />
+                      )}
+                      <span className="truncate">{e.title}</span>
                     </button>
                   ) : (
                     <button
@@ -331,12 +336,20 @@ function MonthView({
                         className="rounded-full shrink-0"
                         style={{ width: 6, height: 6, background: visColor(e) }}
                       />
+                      {cat && (
+                        <cat.icon
+                          size={10}
+                          className="shrink-0"
+                          style={{ color: cat.color }}
+                          strokeWidth={2.5}
+                        />
+                      )}
                       <span className="truncate text-[var(--text-dim)]">
                         {e.title}
                       </span>
                     </button>
-                  )
-                )}
+                  );
+                })}
                 {evs.length > 3 && (
                   <div className="text-[10px] text-[var(--text-faint)]">
                     +{evs.length - 3} más
@@ -558,6 +571,7 @@ function WeekView({
               {/* Eventos del día */}
               {evs.map((e) => {
                 const { top, height } = evPosition(e.start, e.end);
+                const cat = getCategory(e.category);
                 return (
                   <button
                     key={e.id}
@@ -565,16 +579,29 @@ function WeekView({
                       ev.stopPropagation();
                       onEditEvent(e);
                     }}
-                    className="absolute left-1 right-1 rounded-md border-l-[3px] bg-[var(--surface-2)] p-1.5 shadow-sm overflow-hidden text-left hover:brightness-110 transition-all z-10"
+                    className="absolute left-1 right-1 rounded-md border-l-[3px] p-1.5 shadow-sm overflow-hidden text-left hover:brightness-110 transition-all z-10"
                     style={{
                       top,
                       height,
                       borderLeftColor: visColor(e),
+                      background: cat
+                        ? `${cat.color}26`
+                        : "var(--surface-2)",
                     }}
                   >
-                    <div className="uppercase-label tnum text-[var(--text-faint)] text-[9px] leading-none">
-                      {e.start}
-                      {e.end && `–${e.end}`}
+                    <div className="flex items-center gap-1 leading-none">
+                      {cat && (
+                        <cat.icon
+                          size={10}
+                          style={{ color: cat.color }}
+                          strokeWidth={2.5}
+                          className="shrink-0"
+                        />
+                      )}
+                      <span className="uppercase-label tnum text-[var(--text-faint)] text-[9px]">
+                        {e.start}
+                        {e.end && `–${e.end}`}
+                      </span>
                     </div>
                     <div className="font-medium text-[11px] leading-tight mt-0.5 line-clamp-2">
                       {e.title}
@@ -722,6 +749,7 @@ function DayView({
           {/* Eventos */}
           {evs.map((e) => {
             const { top, height } = evPosition(e.start, e.end);
+            const cat = getCategory(e.category);
             return (
               <button
                 key={e.id}
@@ -729,14 +757,27 @@ function DayView({
                   ev.stopPropagation();
                   onEditEvent(e);
                 }}
-                className="absolute left-2 right-2 rounded-lg border-l-[3px] bg-[var(--surface-2)] p-2 shadow-sm overflow-hidden text-left hover:brightness-110 transition-all z-10"
+                className="absolute left-2 right-2 rounded-lg border-l-[3px] p-2 shadow-sm overflow-hidden text-left hover:brightness-110 transition-all z-10"
                 style={{
                   top,
                   height,
                   borderLeftColor: visColor(e),
+                  background: cat ? `${cat.color}26` : "var(--surface-2)",
                 }}
               >
                 <div className="flex items-center gap-2 mb-0.5">
+                  {cat && (
+                    <span
+                      className="flex items-center gap-1 rounded px-1.5 py-0.5 text-[9px] font-medium uppercase tracking-wider"
+                      style={{
+                        background: `${cat.color}33`,
+                        color: cat.color,
+                      }}
+                    >
+                      <cat.icon size={10} strokeWidth={2.5} />
+                      {cat.label}
+                    </span>
+                  )}
                   <span className="uppercase-label tnum text-[var(--text-faint)]">
                     {e.start}
                     {e.end && ` – ${e.end}`}
@@ -776,7 +817,9 @@ function EventList({
 }) {
   return (
     <div className="space-y-2">
-      {events.map((e) => (
+      {events.map((e) => {
+        const cat = getCategory(e.category);
+        return (
         <button
           key={e.id}
           onClick={() => onEdit(e)}
@@ -787,7 +830,21 @@ function EventList({
             style={{ width: 10, height: 10, background: visColor(e) }}
           />
           <div className="flex-1">
-            <div className="font-medium">{e.title}</div>
+            <div className="flex items-center gap-2 flex-wrap">
+              <div className="font-medium">{e.title}</div>
+              {cat && (
+                <span
+                  className="flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-medium uppercase tracking-wider"
+                  style={{
+                    background: `${cat.color}22`,
+                    color: cat.color,
+                  }}
+                >
+                  <cat.icon size={10} strokeWidth={2.5} />
+                  {cat.label}
+                </span>
+              )}
+            </div>
             <div className="flex items-center gap-3 text-xs text-[var(--text-dim)] mt-1">
               <span className="flex items-center gap-1">
                 <Clock size={12} />
@@ -806,7 +863,8 @@ function EventList({
             <AvatarStack ids={e.visibleTo} size={22} />
           </div>
         </button>
-      ))}
+        );
+      })}
     </div>
   );
 }

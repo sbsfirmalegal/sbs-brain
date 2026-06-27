@@ -31,10 +31,19 @@ export interface Task {
 
 export type EventKind = "reunion" | "evento";
 
+export type EventCategory =
+  | "audiencia"
+  | "diligencia"
+  | "plazo"
+  | "reunion"
+  | "personal"
+  | "otro";
+
 export interface CalEvent {
   id: string;
   title: string;
   kind: EventKind;
+  category?: EventCategory;
   date: string; // ISO date
   start: string; // HH:mm
   end?: string;
