@@ -16,6 +16,8 @@ import {
   Settings,
   PanelLeftClose,
   PanelLeftOpen,
+  Menu,
+  Bell,
 } from "lucide-react";
 import { useStore } from "../store/store";
 import { USERS } from "../data/users";
@@ -73,6 +75,7 @@ export function Layout() {
   } = useStore();
   const nav = useNavigate();
   const [searchOpen, setSearchOpen] = useState(false);
+  const [moreOpen, setMoreOpen] = useState(false);
   const u = currentUser ? USERS[currentUser] : null;
   const sw = sidebarCollapsed ? 80 : 256;
 
@@ -215,8 +218,8 @@ export function Layout() {
       </div>
 
       {/* Bottom nav móvil */}
-      <nav className="md:hidden fixed bottom-0 inset-x-0 z-30 flex justify-around border-t border-[var(--border)] bg-[var(--surface)]/95 backdrop-blur py-2 overflow-x-auto">
-        {NAV.slice(0, 5).map((item) => (
+      <nav className="md:hidden fixed bottom-0 inset-x-0 z-30 flex justify-around border-t border-[var(--border)] bg-[var(--surface)]/95 backdrop-blur py-2">
+        {NAV.slice(0, 4).map((item) => (
           <NavLink
             key={item.to}
             to={item.to}
@@ -230,7 +233,90 @@ export function Layout() {
             <span className="text-[10px]">{item.label}</span>
           </NavLink>
         ))}
+        <button
+          onClick={() => setMoreOpen((o) => !o)}
+          className="flex flex-col items-center gap-1 px-3 py-1 text-[var(--text-faint)]"
+        >
+          <Menu size={20} />
+          <span className="text-[10px]">Más</span>
+        </button>
       </nav>
+
+      {/* Panel "Más" móvil */}
+      {moreOpen && (
+        <div
+          className="md:hidden fixed inset-0 z-40 flex flex-col justify-end"
+          onClick={() => setMoreOpen(false)}
+        >
+          <div
+            className="rounded-t-2xl border-t border-[var(--border)] bg-[var(--surface)] p-4 pb-8"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="w-10 h-1 rounded-full bg-[var(--border-strong)] mx-auto mb-4" />
+            <div className="grid grid-cols-4 gap-3 mb-4">
+              {NAV.slice(4).map((item) => (
+                <NavLink
+                  key={item.to}
+                  to={item.to}
+                  onClick={() => setMoreOpen(false)}
+                  className={({ isActive }) =>
+                    `flex flex-col items-center gap-1.5 rounded-xl py-3 ${
+                      isActive
+                        ? "bg-[var(--surface-2)] text-[var(--color-dorado)]"
+                        : "text-[var(--text-dim)]"
+                    }`
+                  }
+                >
+                  <item.icon size={22} />
+                  <span className="text-[11px]">{item.label}</span>
+                </NavLink>
+              ))}
+              <NavLink
+                to="/bandeja"
+                onClick={() => setMoreOpen(false)}
+                className={({ isActive }) =>
+                  `flex flex-col items-center gap-1.5 rounded-xl py-3 ${
+                    isActive
+                      ? "bg-[var(--surface-2)] text-[var(--color-dorado)]"
+                      : "text-[var(--text-dim)]"
+                  }`
+                }
+              >
+                <Bell size={22} />
+                <span className="text-[11px]">Bandeja</span>
+              </NavLink>
+              <NavLink
+                to="/ajustes"
+                onClick={() => setMoreOpen(false)}
+                className={({ isActive }) =>
+                  `flex flex-col items-center gap-1.5 rounded-xl py-3 ${
+                    isActive
+                      ? "bg-[var(--surface-2)] text-[var(--color-dorado)]"
+                      : "text-[var(--text-dim)]"
+                  }`
+                }
+              >
+                <Settings size={22} />
+                <span className="text-[11px]">Ajustes</span>
+              </NavLink>
+            </div>
+            <button
+              onClick={() => { toggleTheme(); }}
+              className="w-full flex items-center gap-3 px-4 py-3 rounded-xl text-[var(--text-dim)] hover:bg-[var(--surface-2)]"
+            >
+              <ThemeIcon size={18} />
+              <span className="text-sm">Tema: {theme}</span>
+            </button>
+            <button
+              onClick={() => { logout(); nav("/login"); setMoreOpen(false); }}
+              className="w-full flex items-center gap-3 px-4 py-3 rounded-xl text-[var(--text-dim)] hover:bg-[var(--surface-2)]"
+            >
+              <LogOut size={18} />
+              <span className="text-sm">Cerrar sesión</span>
+            </button>
+          </div>
+        </div>
+      )}
 
       <QuickCapture />
       <CommandSearch open={searchOpen} onClose={() => setSearchOpen(false)} />
