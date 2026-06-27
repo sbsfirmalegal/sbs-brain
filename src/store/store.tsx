@@ -255,14 +255,23 @@ export function StoreProvider({ children }: { children: ReactNode }) {
 
     const generate = async () => {
       const todayKey = todayISO();
+
+      // Consultar directo a Supabase para evitar duplicados por race condition
+      const { data: existingRows } = await supabase
+        .from("notifications")
+        .select("kind, ref_id, created_at")
+        .eq("recipient", meUuid)
+        .gte("created_at", `${todayKey}T00:00:00`);
+
       const existing = new Set(
-        data.notifications
-          .filter((n) => n.recipient === me)
-          .map((n) => `${n.kind}:${n.refId ?? ""}:${n.createdAt.slice(0, 10)}`)
+        (existingRows ?? []).map(
+          (n: any) => `${n.kind}:${n.ref_id ?? ""}`
+        )
       );
+
       const inserts: any[] = [];
       const push = (kind: NotifKind, title: string, opts: Partial<Notification>) => {
-        const key = `${kind}:${opts.refId ?? ""}:${todayKey}`;
+        const key = `${kind}:${opts.refId ?? ""}`;
         if (existing.has(key)) return;
         inserts.push({
           kind,

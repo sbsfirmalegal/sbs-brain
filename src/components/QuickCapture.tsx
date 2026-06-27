@@ -121,7 +121,7 @@ export function QuickCapture() {
       <motion.button
         whileTap={{ scale: 0.92 }}
         onClick={() => setOpen(true)}
-        className="fixed bottom-6 right-6 z-40 grid place-items-center rounded-full shadow-lg"
+        className="fixed bottom-20 right-4 md:bottom-6 md:right-6 z-40 grid place-items-center rounded-full shadow-lg"
         style={{
           width: 60,
           height: 60,
