@@ -44,13 +44,20 @@ export function Agenda() {
   const [modal, setModal] = useState<ModalState | null>(null);
 
   const events = visible(data.events);
-  const byDay = useMemo(() => {
+  const { byDay, allDayByDay } = useMemo(() => {
     const m: Record<string, CalEvent[]> = {};
-    events.forEach((e) => (m[e.date] = [...(m[e.date] || []), e]));
+    const a: Record<string, CalEvent[]> = {};
+    events.forEach((e) => {
+      if (e.allDay) {
+        a[e.date] = [...(a[e.date] || []), e];
+      } else {
+        m[e.date] = [...(m[e.date] || []), e];
+      }
+    });
     Object.values(m).forEach((arr) =>
       arr.sort((a, b) => a.start.localeCompare(b.start))
     );
-    return m;
+    return { byDay: m, allDayByDay: a };
   }, [events]);
 
   const headerLabel = useMemo(() => {
@@ -160,6 +167,7 @@ export function Agenda() {
         <MonthView
           cursor={cursor}
           byDay={byDay}
+          allDayByDay={allDayByDay}
           onCreateEvent={openCreate}
           onEditEvent={openEdit}
         />
@@ -168,6 +176,7 @@ export function Agenda() {
         <WeekView
           cursor={cursor}
           byDay={byDay}
+          allDayByDay={allDayByDay}
           onCreateEvent={openCreate}
           onEditEvent={openEdit}
         />
@@ -176,6 +185,7 @@ export function Agenda() {
         <DayView
           cursor={cursor}
           byDay={byDay}
+          allDayByDay={allDayByDay}
           onCreateEvent={openCreate}
           onEditEvent={openEdit}
         />
@@ -197,11 +207,13 @@ export function Agenda() {
 function MonthView({
   cursor,
   byDay,
+  allDayByDay,
   onCreateEvent,
   onEditEvent,
 }: {
   cursor: Date;
   byDay: Record<string, CalEvent[]>;
+  allDayByDay: Record<string, CalEvent[]>;
   onCreateEvent: (date: string, time?: string) => void;
   onEditEvent: (e: CalEvent) => void;
 }) {
@@ -211,7 +223,9 @@ function MonthView({
     const end = endOfWeek(endOfMonth(cursor), { weekStartsOn: 1 });
     return eachDayOfInterval({ start, end });
   }, [cursor]);
-  const selEvents = selected ? byDay[selected] || [] : [];
+  const selEvents = selected
+    ? [...(allDayByDay[selected] || []), ...(byDay[selected] || [])]
+    : [];
 
   return (
     <>
@@ -226,7 +240,9 @@ function MonthView({
         ))}
         {days.map((day) => {
           const key = iso(day);
-          const evs = byDay[key] || [];
+          const allDayEvs = allDayByDay[key] || [];
+          const timedEvs = byDay[key] || [];
+          const evs = [...allDayEvs, ...timedEvs];
           const inMonth = isSameMonth(day, cursor);
           const isSelected = selected === key;
           return (
@@ -265,24 +281,38 @@ function MonthView({
                 </button>
               </div>
               <div className="space-y-1">
-                {evs.slice(0, 3).map((e) => (
-                  <button
-                    key={e.id}
-                    onClick={(ev) => {
-                      ev.stopPropagation();
-                      onEditEvent(e);
-                    }}
-                    className="flex items-center gap-1 text-[11px] truncate w-full text-left hover:opacity-75 transition-opacity"
-                  >
-                    <span
-                      className="rounded-full shrink-0"
-                      style={{ width: 6, height: 6, background: visColor(e) }}
-                    />
-                    <span className="truncate text-[var(--text-dim)]">
+                {evs.slice(0, 3).map((e) =>
+                  e.allDay ? (
+                    <button
+                      key={e.id}
+                      onClick={(ev) => {
+                        ev.stopPropagation();
+                        onEditEvent(e);
+                      }}
+                      className="block w-full truncate rounded px-1.5 py-0.5 text-[10px] font-medium text-left text-[#0A1828] hover:brightness-110 transition-all"
+                      style={{ background: visColor(e) }}
+                    >
                       {e.title}
-                    </span>
-                  </button>
-                ))}
+                    </button>
+                  ) : (
+                    <button
+                      key={e.id}
+                      onClick={(ev) => {
+                        ev.stopPropagation();
+                        onEditEvent(e);
+                      }}
+                      className="flex items-center gap-1 text-[11px] truncate w-full text-left hover:opacity-75 transition-opacity"
+                    >
+                      <span
+                        className="rounded-full shrink-0"
+                        style={{ width: 6, height: 6, background: visColor(e) }}
+                      />
+                      <span className="truncate text-[var(--text-dim)]">
+                        {e.title}
+                      </span>
+                    </button>
+                  )
+                )}
                 {evs.length > 3 && (
                   <div className="text-[10px] text-[var(--text-faint)]">
                     +{evs.length - 3} más
@@ -324,11 +354,13 @@ function MonthView({
 function WeekView({
   cursor,
   byDay,
+  allDayByDay,
   onCreateEvent,
   onEditEvent,
 }: {
   cursor: Date;
   byDay: Record<string, CalEvent[]>;
+  allDayByDay: Record<string, CalEvent[]>;
   onCreateEvent: (date: string, time?: string) => void;
   onEditEvent: (e: CalEvent) => void;
 }) {
@@ -406,6 +438,36 @@ function WeekView({
           );
         })}
       </div>
+
+      {/* Fila eventos todo el día */}
+      {days.some((d) => (allDayByDay[iso(d)] || []).length > 0) && (
+        <div className="grid grid-cols-[56px_repeat(7,1fr)] border-b border-[var(--border)] bg-[var(--surface-2)]/40">
+          <div className="border-r border-[var(--border)] flex items-center justify-end pr-2 text-[9px] uppercase tracking-wider text-[var(--text-faint)]">
+            todo el día
+          </div>
+          {days.map((day) => {
+            const key = iso(day);
+            const evs = allDayByDay[key] || [];
+            return (
+              <div
+                key={key}
+                className="border-r border-[var(--border)] last:border-r-0 p-1 space-y-0.5 min-h-[28px]"
+              >
+                {evs.map((e) => (
+                  <button
+                    key={e.id}
+                    onClick={() => onEditEvent(e)}
+                    className="block w-full truncate rounded px-1.5 py-0.5 text-[10px] font-medium text-left text-[#0A1828] hover:brightness-110 transition-all"
+                    style={{ background: visColor(e) }}
+                  >
+                    {e.title}
+                  </button>
+                ))}
+              </div>
+            );
+          })}
+        </div>
+      )}
 
       {/* Grid de horas */}
       <div className="grid grid-cols-[56px_repeat(7,1fr)] relative">
@@ -512,16 +574,19 @@ function WeekView({
 function DayView({
   cursor,
   byDay,
+  allDayByDay,
   onCreateEvent,
   onEditEvent,
 }: {
   cursor: Date;
   byDay: Record<string, CalEvent[]>;
+  allDayByDay: Record<string, CalEvent[]>;
   onCreateEvent: (date: string, time?: string) => void;
   onEditEvent: (e: CalEvent) => void;
 }) {
   const key = iso(cursor);
   const evs = byDay[key] || [];
+  const allDayEvs = allDayByDay[key] || [];
   const hours = Array.from({ length: 14 }, (_, i) => 7 + i); // 7am – 8pm
 
   const [, tick] = useState(0);
@@ -554,6 +619,27 @@ function DayView({
 
   return (
     <div className="rounded-2xl border border-[var(--border)] overflow-hidden bg-[var(--surface)]">
+      {/* Fila eventos todo el día */}
+      {allDayEvs.length > 0 && (
+        <div className="grid grid-cols-[64px_1fr] border-b border-[var(--border)] bg-[var(--surface-2)]/40">
+          <div className="border-r border-[var(--border)] flex items-center justify-end pr-2 text-[9px] uppercase tracking-wider text-[var(--text-faint)]">
+            todo el día
+          </div>
+          <div className="p-2 space-y-1">
+            {allDayEvs.map((e) => (
+              <button
+                key={e.id}
+                onClick={() => onEditEvent(e)}
+                className="block w-full rounded-md px-2 py-1.5 text-sm font-medium text-left text-[#0A1828] hover:brightness-110 transition-all"
+                style={{ background: visColor(e) }}
+              >
+                {e.title}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
       <div className="relative grid grid-cols-[64px_1fr]">
         {/* Columna horas */}
         <div className="border-r border-[var(--border)]">
@@ -679,8 +765,7 @@ function EventList({
             <div className="flex items-center gap-3 text-xs text-[var(--text-dim)] mt-1">
               <span className="flex items-center gap-1">
                 <Clock size={12} />
-                {e.start}
-                {e.end && `–${e.end}`}
+                {e.allDay ? "Todo el día" : `${e.start}${e.end ? `–${e.end}` : ""}`}
               </span>
               {e.location && (
                 <span className="flex items-center gap-1 italic">

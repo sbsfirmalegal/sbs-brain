@@ -38,6 +38,7 @@ export interface CalEvent {
   date: string; // ISO date
   start: string; // HH:mm
   end?: string;
+  allDay?: boolean;
   location?: string;
   owner: UserId;
   visibleTo: Visibility;

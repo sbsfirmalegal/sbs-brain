@@ -58,6 +58,7 @@ export function rowToEvent(r: any, m: ProfileMap): CalEvent {
     date: r.date,
     start: r.start_time,
     end: r.end_time ?? undefined,
+    allDay: r.all_day ?? false,
     location: r.location ?? undefined,
     owner: m.slugOf[r.owner],
     visibleTo: uuidsToSlugs(r.visible_to, m),
@@ -73,6 +74,7 @@ export function eventToRow(e: Partial<CalEvent>, m: ProfileMap) {
   if (e.date !== undefined) row.date = e.date;
   if (e.start !== undefined) row.start_time = e.start;
   if (e.end !== undefined) row.end_time = e.end ?? null;
+  if (e.allDay !== undefined) row.all_day = e.allDay;
   if (e.location !== undefined) row.location = e.location ?? null;
   if (e.owner !== undefined) row.owner = m.uuidOf[e.owner];
   if (e.visibleTo !== undefined) row.visible_to = slugsToUuids(e.visibleTo, m);

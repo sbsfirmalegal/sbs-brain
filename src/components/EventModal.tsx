@@ -23,6 +23,7 @@ export function EventModal({ initialDate, initialTime, event, onClose }: Props) 
   const [date, setDate] = useState(event?.date ?? initialDate ?? "");
   const [start, setStart] = useState(event?.start ?? initialTime ?? "09:00");
   const [end, setEnd] = useState(event?.end ?? "");
+  const [allDay, setAllDay] = useState(event?.allDay ?? false);
   const [location, setLocation] = useState(event?.location ?? "");
   const [notes, setNotes] = useState(event?.notes ?? "");
   const [vis, setVis] = useState<Visibility>(
@@ -52,8 +53,9 @@ export function EventModal({ initialDate, initialTime, event, onClose }: Props) 
       title: title.trim(),
       kind,
       date,
-      start,
-      end: end || undefined,
+      start: allDay ? "00:00" : start,
+      end: allDay ? undefined : (end || undefined),
+      allDay,
       location: location.trim() || undefined,
       notes: notes.trim() || undefined,
       visibleTo: vis.length ? vis : [currentUser ?? "nelson"],
@@ -129,6 +131,17 @@ export function EventModal({ initialDate, initialTime, event, onClose }: Props) 
             ))}
           </div>
 
+          {/* Toggle todo el día */}
+          <label className="flex items-center gap-2 mb-3 cursor-pointer select-none">
+            <input
+              type="checkbox"
+              checked={allDay}
+              onChange={(e) => setAllDay(e.target.checked)}
+              className="accent-[var(--color-dorado)] w-4 h-4"
+            />
+            <span className="text-sm text-[var(--text-dim)]">Todo el día</span>
+          </label>
+
           {/* Fecha y horas */}
           <div className="flex flex-wrap gap-2 mb-4">
             <input
@@ -137,20 +150,24 @@ export function EventModal({ initialDate, initialTime, event, onClose }: Props) 
               onChange={(e) => setDate(e.target.value)}
               className="rounded-lg border border-[var(--border)] bg-[var(--surface-2)] px-3 py-2 text-sm flex-1 min-w-[140px]"
             />
-            <input
-              type="time"
-              value={start}
-              onChange={(e) => setStart(e.target.value)}
-              className="rounded-lg border border-[var(--border)] bg-[var(--surface-2)] px-3 py-2 text-sm tnum w-[110px]"
-            />
-            <span className="self-center text-[var(--text-faint)] text-sm">→</span>
-            <input
-              type="time"
-              value={end}
-              onChange={(e) => setEnd(e.target.value)}
-              placeholder="fin"
-              className="rounded-lg border border-[var(--border)] bg-[var(--surface-2)] px-3 py-2 text-sm tnum w-[110px] placeholder:text-[var(--text-faint)]"
-            />
+            {!allDay && (
+              <>
+                <input
+                  type="time"
+                  value={start}
+                  onChange={(e) => setStart(e.target.value)}
+                  className="rounded-lg border border-[var(--border)] bg-[var(--surface-2)] px-3 py-2 text-sm tnum w-[110px]"
+                />
+                <span className="self-center text-[var(--text-faint)] text-sm">→</span>
+                <input
+                  type="time"
+                  value={end}
+                  onChange={(e) => setEnd(e.target.value)}
+                  placeholder="fin"
+                  className="rounded-lg border border-[var(--border)] bg-[var(--surface-2)] px-3 py-2 text-sm tnum w-[110px] placeholder:text-[var(--text-faint)]"
+                />
+              </>
+            )}
           </div>
 
           {/* Ubicación */}
