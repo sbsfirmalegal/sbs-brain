@@ -43,6 +43,7 @@ export function QuickCapture() {
   const [vis, setVis] = useState<Visibility>([currentUser ?? "nelson"]);
   const [date, setDate] = useState(todayISO());
   const [time, setTime] = useState("09:00");
+  const [timeEnd, setTimeEnd] = useState("");
   const [priority, setPriority] = useState<Priority>("media");
 
   useEffect(() => {
@@ -73,6 +74,7 @@ export function QuickCapture() {
     setKind(null);
     setDate(todayISO());
     setTime("09:00");
+    setTimeEnd("");
     setPriority("media");
     setVis([currentUser ?? "nelson"]);
   }
@@ -98,6 +100,7 @@ export function QuickCapture() {
         title,
         date,
         start: time,
+        end: timeEnd || undefined,
         attendees: visibleTo,
         visibleTo,
       });
@@ -108,6 +111,7 @@ export function QuickCapture() {
           visibleTo,
           date,
           start: time,
+          end: timeEnd || undefined,
           kind: "reunion",
           meetingId: m.id,
         });
@@ -218,6 +222,18 @@ export function QuickCapture() {
                           onChange={(e) => setTime(e.target.value)}
                           className="rounded-lg border border-[var(--border)] bg-[var(--surface-2)] px-3 py-2 text-sm tnum"
                         />
+                      )}
+                      {active === "reunion" && (
+                        <>
+                          <span className="text-[var(--text-faint)] text-sm">→</span>
+                          <input
+                            type="time"
+                            value={timeEnd}
+                            onChange={(e) => setTimeEnd(e.target.value)}
+                            placeholder="fin"
+                            className="rounded-lg border border-[var(--border)] bg-[var(--surface-2)] px-3 py-2 text-sm tnum w-[110px] placeholder:text-[var(--text-faint)]"
+                          />
+                        </>
                       )}
                       {active === "tarea" && (
                         <>

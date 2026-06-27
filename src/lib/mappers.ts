@@ -89,6 +89,7 @@ export function rowToMeeting(r: any, m: ProfileMap): Meeting {
     type: r.type,
     date: r.date,
     start: r.start_time,
+    end: r.end_time ?? undefined,
     attendees: uuidsToSlugs(r.attendees, m),
     visibleTo: uuidsToSlugs(r.visible_to, m),
     minute: r.minute ?? "",
@@ -103,6 +104,7 @@ export function meetingToRow(mt: Partial<Meeting>, m: ProfileMap) {
   if (mt.type !== undefined) row.type = mt.type;
   if (mt.date !== undefined) row.date = mt.date;
   if (mt.start !== undefined) row.start_time = mt.start;
+  if (mt.end !== undefined) row.end_time = mt.end ?? null;
   if (mt.attendees !== undefined) row.attendees = slugsToUuids(mt.attendees, m);
   if (mt.visibleTo !== undefined) row.visible_to = slugsToUuids(mt.visibleTo, m);
   if (mt.minute !== undefined) row.minute = mt.minute;

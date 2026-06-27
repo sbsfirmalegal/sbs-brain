@@ -62,6 +62,7 @@ export interface Meeting {
   type: MeetingType;
   date: string;
   start: string;
+  end?: string;
   attendees: UserId[];
   visibleTo: Visibility;
   minute: string;

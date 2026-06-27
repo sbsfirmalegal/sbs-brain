@@ -83,6 +83,7 @@ interface Ctx {
   // meetings
   addMeeting: (m: Partial<Meeting> & { title: string }) => Promise<Meeting | null>;
   updateMeeting: (id: string, patch: Partial<Meeting>) => Promise<void>;
+  deleteMeeting: (id: string) => Promise<void>;
   // notes
   addNote: (n: Partial<Note> & { title: string; owner: UserId }) => Promise<void>;
   updateNote: (id: string, patch: Partial<Note>) => Promise<void>;
@@ -435,6 +436,9 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       updateMeeting: async (id, patch) => {
         const m = requireMap();
         await supabase.from("meetings").update(meetingToRow(patch, m)).eq("id", id);
+      },
+      deleteMeeting: async (id) => {
+        await supabase.from("meetings").delete().eq("id", id);
       },
 
       /* ─── NOTES ─── */

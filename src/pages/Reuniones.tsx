@@ -8,6 +8,7 @@ import {
   CheckSquare,
   Lock,
   Landmark,
+  Trash2,
 } from "lucide-react";
 import { useStore } from "../store/store";
 import { SectionTitle, AvatarStack, VisibilityBadge } from "../components/ui";
@@ -100,9 +101,10 @@ function MeetingDetail({
   meeting: Meeting;
   onClose: () => void;
 }) {
-  const { data, updateMeeting, addTask, currentUser } = useStore();
+  const { data, updateMeeting, deleteMeeting, addTask, currentUser } = useStore();
   const linkedTasks = data.tasks.filter((t) => t.meetingId === meeting.id);
 
+  const [confirmDelete, setConfirmDelete] = useState(false);
   const [newAgreement, setNewAgreement] = useState("");
   const [agreementKind, setAgreementKind] = useState<AgreementKind>("acuerdo");
   const [newTask, setNewTask] = useState("");
@@ -171,7 +173,10 @@ function MeetingDetail({
 
         <h2 className="font-serif text-3xl leading-tight">{meeting.title}</h2>
         <div className="flex items-center gap-3 mt-2 text-[var(--text-dim)]">
-          <span className="tnum">{fmtDay(meeting.date)} · {meeting.start}</span>
+          <span className="tnum">
+            {fmtDay(meeting.date)} · {meeting.start}
+            {meeting.end && ` – ${meeting.end}`}
+          </span>
           <AvatarStack ids={meeting.attendees} size={24} />
         </div>
         <div className="gold-rule my-5" />
@@ -301,8 +306,8 @@ function MeetingDetail({
           </div>
         </Section>
 
-        {/* Cerrar */}
-        <div className="mt-8 pt-5 border-t border-[var(--border)]">
+        {/* Cerrar / Eliminar */}
+        <div className="mt-8 pt-5 border-t border-[var(--border)] space-y-3">
           {meeting.closed ? (
             <button
               onClick={() => updateMeeting(meeting.id, { closed: false })}
@@ -330,6 +335,23 @@ function MeetingDetail({
               )}
             </>
           )}
+
+          {/* Eliminar reunión */}
+          <button
+            onClick={async () => {
+              if (!confirmDelete) { setConfirmDelete(true); return; }
+              await deleteMeeting(meeting.id);
+              onClose();
+            }}
+            className={`flex items-center gap-1.5 text-sm rounded-xl px-3 py-2 transition-all ${
+              confirmDelete
+                ? "bg-red-500/20 text-red-400 border border-red-500/40 w-full justify-center"
+                : "text-[var(--text-faint)] hover:text-red-400"
+            }`}
+          >
+            <Trash2 size={15} />
+            {confirmDelete ? "¿Confirmar eliminación de la reunión?" : "Eliminar reunión"}
+          </button>
         </div>
       </motion.div>
     </motion.div>
