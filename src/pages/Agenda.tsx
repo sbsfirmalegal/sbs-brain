@@ -337,69 +337,173 @@ function WeekView({
     return Array.from({ length: 7 }, (_, i) => addDays(start, i));
   }, [cursor]);
 
+  const hours = Array.from({ length: 14 }, (_, i) => 7 + i); // 7am – 8pm
+  const HOUR_HEIGHT = 56; // px por hora
+
+  const [, tick] = useState(0);
+  useEffect(() => {
+    const i = setInterval(() => tick((n) => n + 1), 60000);
+    return () => clearInterval(i);
+  }, []);
+
+  const now = new Date();
+  const minsSince7 = (now.getHours() - 7) * 60 + now.getMinutes();
+  const nowPosition = (minsSince7 / 60) * HOUR_HEIGHT;
+  const showNow = minsSince7 >= 0 && minsSince7 <= 14 * 60;
+
+  const evPosition = (start: string, end?: string) => {
+    const [h, m] = start.split(":").map(Number);
+    const top = ((h - 7) * 60 + m) * (HOUR_HEIGHT / 60);
+    let height = HOUR_HEIGHT * 0.85;
+    if (end) {
+      const [eh, em] = end.split(":").map(Number);
+      const mins = (eh - h) * 60 + (em - m);
+      height = Math.max(HOUR_HEIGHT * 0.5, (mins / 60) * HOUR_HEIGHT);
+    }
+    return { top, height };
+  };
+
+  function timeFromY(y: number): string {
+    const hourFloat = y / HOUR_HEIGHT;
+    const totalMins = Math.round(hourFloat * 2) * 30; // snap a 30 min
+    const h = Math.floor(totalMins / 60) + 7;
+    const m = totalMins % 60;
+    return `${String(Math.min(h, 20)).padStart(2, "0")}:${String(m).padStart(2, "0")}`;
+  }
+
   return (
-    <div className="grid grid-cols-7 gap-px rounded-2xl overflow-hidden border border-[var(--border)] bg-[var(--border)]">
-      {days.map((day) => {
-        const key = iso(day);
-        const evs = byDay[key] || [];
-        const today = isToday(day);
-        return (
-          <div
-            key={key}
-            className="bg-[var(--bg)] min-h-[420px] flex flex-col"
-          >
-            {/* Encabezado del día */}
+    <div className="rounded-2xl border border-[var(--border)] overflow-hidden bg-[var(--surface)]">
+      {/* Encabezado de días */}
+      <div className="grid grid-cols-[56px_repeat(7,1fr)] border-b border-[var(--border)]">
+        <div className="border-r border-[var(--border)]" />
+        {days.map((day) => {
+          const today = isToday(day);
+          return (
             <button
-              onClick={() => onCreateEvent(key)}
-              className={`group px-3 py-3 border-b border-[var(--border)] text-left w-full transition-colors hover:bg-[var(--surface)] ${
-                today ? "bg-[var(--surface)]" : ""
+              key={iso(day)}
+              onClick={() => onCreateEvent(iso(day))}
+              className={`group px-2 py-3 text-left border-r border-[var(--border)] last:border-r-0 transition-colors hover:bg-[var(--surface-2)] ${
+                today ? "bg-[var(--surface-2)]" : ""
               }`}
             >
+              <div className="uppercase-label text-[var(--text-faint)]">
+                {format(day, "EEE", { locale: es })}
+              </div>
               <div className="flex items-center justify-between">
-                <div>
-                  <div className="uppercase-label text-[var(--text-faint)]">
-                    {format(day, "EEE", { locale: es })}
-                  </div>
-                  <div
-                    className={`font-serif text-2xl tnum ${
-                      today ? "text-[var(--color-dorado)]" : ""
-                    }`}
-                  >
-                    {format(day, "d")}
-                  </div>
+                <div
+                  className={`font-serif text-2xl tnum ${
+                    today ? "text-[var(--color-dorado)]" : ""
+                  }`}
+                >
+                  {format(day, "d")}
                 </div>
                 <Plus
-                  size={14}
+                  size={13}
                   className="opacity-0 group-hover:opacity-60 transition-opacity text-[var(--text-faint)]"
                 />
               </div>
             </button>
-            <div className="flex-1 p-2 space-y-1.5 overflow-y-auto">
-              {evs.length === 0 && (
-                <p className="text-[10px] text-[var(--text-faint)] italic px-1 py-2">
-                  —
-                </p>
-              )}
-              {evs.map((e) => (
-                <button
-                  key={e.id}
-                  onClick={() => onEditEvent(e)}
-                  className="rounded-lg border-l-2 bg-[var(--surface)] px-2 py-1.5 text-xs w-full text-left hover:brightness-110 transition-all"
-                  style={{ borderLeftColor: visColor(e) }}
-                >
-                  <div className="tnum text-[var(--text-faint)]">{e.start}</div>
-                  <div className="font-medium leading-tight">{e.title}</div>
-                  {e.location && (
-                    <div className="italic text-[10px] text-[var(--text-dim)] mt-0.5">
-                      {e.location}
-                    </div>
-                  )}
-                </button>
-              ))}
+          );
+        })}
+      </div>
+
+      {/* Grid de horas */}
+      <div className="grid grid-cols-[56px_repeat(7,1fr)] relative">
+        {/* Columna de horas */}
+        <div className="border-r border-[var(--border)]">
+          {hours.map((h) => (
+            <div
+              key={h}
+              style={{ height: HOUR_HEIGHT }}
+              className="flex items-start justify-end pr-2 pt-1 text-[10px] tnum text-[var(--text-faint)]"
+            >
+              {String(h).padStart(2, "0")}:00
             </div>
-          </div>
-        );
-      })}
+          ))}
+        </div>
+
+        {/* 7 columnas de días */}
+        {days.map((day) => {
+          const key = iso(day);
+          const evs = byDay[key] || [];
+          const today = isToday(day);
+          return (
+            <div
+              key={key}
+              className="relative border-r border-[var(--border)] last:border-r-0 cursor-pointer"
+              onClick={(e) => {
+                const rect = (e.currentTarget as HTMLDivElement).getBoundingClientRect();
+                const relY = e.clientY - rect.top;
+                onCreateEvent(key, timeFromY(relY));
+              }}
+            >
+              {hours.map((h) => (
+                <div
+                  key={h}
+                  style={{ height: HOUR_HEIGHT }}
+                  className="border-b border-[var(--border)] hover:bg-[var(--surface-2)] transition-colors"
+                />
+              ))}
+
+              {/* Línea "ahora" en la columna del día actual */}
+              {today && showNow && (
+                <div
+                  className="absolute left-0 right-0 flex items-center pointer-events-none z-20"
+                  style={{ top: nowPosition }}
+                >
+                  <span
+                    className="rounded-full"
+                    style={{
+                      width: 8,
+                      height: 8,
+                      background: "var(--color-dorado)",
+                      marginLeft: -3,
+                      boxShadow: "0 0 0 3px rgba(201,168,76,0.18)",
+                    }}
+                  />
+                  <div
+                    className="flex-1 h-px"
+                    style={{ background: "var(--color-dorado)" }}
+                  />
+                </div>
+              )}
+
+              {/* Eventos del día */}
+              {evs.map((e) => {
+                const { top, height } = evPosition(e.start, e.end);
+                return (
+                  <button
+                    key={e.id}
+                    onClick={(ev) => {
+                      ev.stopPropagation();
+                      onEditEvent(e);
+                    }}
+                    className="absolute left-1 right-1 rounded-md border-l-[3px] bg-[var(--surface-2)] p-1.5 shadow-sm overflow-hidden text-left hover:brightness-110 transition-all z-10"
+                    style={{
+                      top,
+                      height,
+                      borderLeftColor: visColor(e),
+                    }}
+                  >
+                    <div className="uppercase-label tnum text-[var(--text-faint)] text-[9px] leading-none">
+                      {e.start}
+                      {e.end && `–${e.end}`}
+                    </div>
+                    <div className="font-medium text-[11px] leading-tight mt-0.5 line-clamp-2">
+                      {e.title}
+                    </div>
+                    {e.location && height > HOUR_HEIGHT && (
+                      <div className="italic text-[9px] text-[var(--text-dim)] mt-0.5 truncate">
+                        {e.location}
+                      </div>
+                    )}
+                  </button>
+                );
+              })}
+            </div>
+          );
+        })}
+      </div>
     </div>
   );
 }
