@@ -20,6 +20,7 @@ import { useStore } from "../store/store";
 import { iso } from "../lib/dates";
 import { visibilityLevel, VisibilityBadge, AvatarStack } from "../components/ui";
 import { EventModal } from "../components/EventModal";
+import { MiniCalendar } from "../components/MiniCalendar";
 import type { CalEvent } from "../data/types";
 
 type View = "dia" | "semana" | "mes";
@@ -44,6 +45,10 @@ export function Agenda() {
   const [modal, setModal] = useState<ModalState | null>(null);
 
   const events = visible(data.events);
+  const datesWithEvents = useMemo(
+    () => new Set(events.map((e) => e.date)),
+    [events]
+  );
   const { byDay, allDayByDay } = useMemo(() => {
     const m: Record<string, CalEvent[]> = {};
     const a: Record<string, CalEvent[]> = {};
@@ -173,22 +178,41 @@ export function Agenda() {
         />
       )}
       {view === "semana" && (
-        <WeekView
-          cursor={cursor}
-          byDay={byDay}
-          allDayByDay={allDayByDay}
-          onCreateEvent={openCreate}
-          onEditEvent={openEdit}
-        />
+        <div className="grid grid-cols-1 lg:grid-cols-[220px_1fr] gap-4 items-start">
+          <div className="hidden lg:block sticky top-4">
+            <MiniCalendar
+              selected={cursor}
+              highlightWeek
+              onSelectDate={setCursor}
+              datesWithEvents={datesWithEvents}
+            />
+          </div>
+          <WeekView
+            cursor={cursor}
+            byDay={byDay}
+            allDayByDay={allDayByDay}
+            onCreateEvent={openCreate}
+            onEditEvent={openEdit}
+          />
+        </div>
       )}
       {view === "dia" && (
-        <DayView
-          cursor={cursor}
-          byDay={byDay}
-          allDayByDay={allDayByDay}
-          onCreateEvent={openCreate}
-          onEditEvent={openEdit}
-        />
+        <div className="grid grid-cols-1 lg:grid-cols-[220px_1fr] gap-4 items-start">
+          <div className="hidden lg:block sticky top-4">
+            <MiniCalendar
+              selected={cursor}
+              onSelectDate={setCursor}
+              datesWithEvents={datesWithEvents}
+            />
+          </div>
+          <DayView
+            cursor={cursor}
+            byDay={byDay}
+            allDayByDay={allDayByDay}
+            onCreateEvent={openCreate}
+            onEditEvent={openEdit}
+          />
+        </div>
       )}
 
       {modal && (
