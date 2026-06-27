@@ -428,9 +428,10 @@ function WeekView({
   }
 
   return (
-    <div className="rounded-2xl border border-[var(--border)] overflow-hidden bg-[var(--surface)]">
+    <div className="rounded-2xl border border-[var(--border)] overflow-x-auto bg-[var(--surface)]">
+      <div className="min-w-[720px]">
       {/* Encabezado de días */}
-      <div className="grid grid-cols-[56px_repeat(7,1fr)] border-b border-[var(--border)]">
+      <div className="grid grid-cols-[56px_repeat(7,minmax(96px,1fr))] border-b border-[var(--border)]">
         <div className="border-r border-[var(--border)]" />
         {days.map((day) => {
           const today = isToday(day);
@@ -465,7 +466,7 @@ function WeekView({
 
       {/* Fila eventos todo el día */}
       {days.some((d) => (allDayByDay[iso(d)] || []).length > 0) && (
-        <div className="grid grid-cols-[56px_repeat(7,1fr)] border-b border-[var(--border)] bg-[var(--surface-2)]/40">
+        <div className="grid grid-cols-[56px_repeat(7,minmax(96px,1fr))] border-b border-[var(--border)] bg-[var(--surface-2)]/40">
           <div className="border-r border-[var(--border)] flex items-center justify-end pr-2 text-[9px] uppercase tracking-wider text-[var(--text-faint)]">
             todo el día
           </div>
@@ -494,7 +495,7 @@ function WeekView({
       )}
 
       {/* Grid de horas */}
-      <div className="grid grid-cols-[56px_repeat(7,1fr)] relative">
+      <div className="grid grid-cols-[56px_repeat(7,minmax(96px,1fr))] relative">
         {/* Columna de horas */}
         <div className="border-r border-[var(--border)]">
           {hours.map((h) => (
@@ -589,6 +590,7 @@ function WeekView({
             </div>
           );
         })}
+      </div>
       </div>
     </div>
   );
