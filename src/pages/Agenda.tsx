@@ -15,13 +15,20 @@ import {
   isSameDay,
 } from "date-fns";
 import { es } from "date-fns/locale";
-import { ChevronLeft, ChevronRight, MapPin, Clock } from "lucide-react";
+import { ChevronLeft, ChevronRight, MapPin, Clock, Plus } from "lucide-react";
 import { useStore } from "../store/store";
 import { iso } from "../lib/dates";
 import { visibilityLevel, VisibilityBadge, AvatarStack } from "../components/ui";
+import { EventModal } from "../components/EventModal";
 import type { CalEvent } from "../data/types";
 
 type View = "dia" | "semana" | "mes";
+
+interface ModalState {
+  initialDate?: string;
+  initialTime?: string;
+  event?: CalEvent;
+}
 
 const visColor = (e: CalEvent) => {
   const lvl = visibilityLevel(e.visibleTo);
@@ -34,6 +41,7 @@ export function Agenda() {
   const { data, visible } = useStore();
   const [view, setView] = useState<View>("mes");
   const [cursor, setCursor] = useState(new Date());
+  const [modal, setModal] = useState<ModalState | null>(null);
 
   const events = visible(data.events);
   const byDay = useMemo(() => {
@@ -64,6 +72,14 @@ export function Agenda() {
     if (view === "mes") setCursor(addMonths(cursor, dir));
   }
 
+  function openCreate(date: string, time?: string) {
+    setModal({ initialDate: date, initialTime: time });
+  }
+
+  function openEdit(event: CalEvent) {
+    setModal({ event });
+  }
+
   return (
     <div>
       <div className="flex flex-wrap items-end justify-between gap-4 mb-2">
@@ -86,6 +102,16 @@ export function Agenda() {
         </div>
 
         <div className="flex items-center gap-2 flex-wrap">
+          {/* Botón nuevo evento */}
+          <button
+            onClick={() => openCreate(iso(cursor))}
+            className="flex items-center gap-1.5 rounded-xl px-4 py-2 text-sm font-semibold"
+            style={{ background: "var(--color-dorado)", color: "#0A1828" }}
+          >
+            <Plus size={16} strokeWidth={2.5} />
+            Nuevo evento
+          </button>
+
           {/* Selector de vista */}
           <div className="flex rounded-xl border border-[var(--border)] p-1 bg-[var(--surface)]">
             {(["dia", "semana", "mes"] as View[]).map((v) => (
@@ -130,9 +156,39 @@ export function Agenda() {
         <Legend color="var(--color-verde)" label="Los 3 socios" />
       </div>
 
-      {view === "mes" && <MonthView cursor={cursor} byDay={byDay} />}
-      {view === "semana" && <WeekView cursor={cursor} byDay={byDay} />}
-      {view === "dia" && <DayView cursor={cursor} byDay={byDay} />}
+      {view === "mes" && (
+        <MonthView
+          cursor={cursor}
+          byDay={byDay}
+          onCreateEvent={openCreate}
+          onEditEvent={openEdit}
+        />
+      )}
+      {view === "semana" && (
+        <WeekView
+          cursor={cursor}
+          byDay={byDay}
+          onCreateEvent={openCreate}
+          onEditEvent={openEdit}
+        />
+      )}
+      {view === "dia" && (
+        <DayView
+          cursor={cursor}
+          byDay={byDay}
+          onCreateEvent={openCreate}
+          onEditEvent={openEdit}
+        />
+      )}
+
+      {modal && (
+        <EventModal
+          initialDate={modal.initialDate}
+          initialTime={modal.initialTime}
+          event={modal.event}
+          onClose={() => setModal(null)}
+        />
+      )}
     </div>
   );
 }
@@ -141,9 +197,13 @@ export function Agenda() {
 function MonthView({
   cursor,
   byDay,
+  onCreateEvent,
+  onEditEvent,
 }: {
   cursor: Date;
   byDay: Record<string, CalEvent[]>;
+  onCreateEvent: (date: string, time?: string) => void;
+  onEditEvent: (e: CalEvent) => void;
 }) {
   const [selected, setSelected] = useState<string | null>(iso(new Date()));
   const days = useMemo(() => {
@@ -168,37 +228,51 @@ function MonthView({
           const key = iso(day);
           const evs = byDay[key] || [];
           const inMonth = isSameMonth(day, cursor);
+          const isSelected = selected === key;
           return (
-            <button
+            <div
               key={key}
               onClick={() => setSelected(key)}
-              className={`min-h-[92px] bg-[var(--bg)] p-2 text-left align-top transition-colors hover:bg-[var(--surface)] ${
+              className={`group relative min-h-[92px] bg-[var(--bg)] p-2 text-left align-top transition-colors cursor-pointer hover:bg-[var(--surface)] ${
                 !inMonth ? "opacity-35" : ""
-              } ${
-                selected === key
-                  ? "ring-1 ring-inset ring-[var(--color-dorado)]"
-                  : ""
-              }`}
+              } ${isSelected ? "ring-1 ring-inset ring-[var(--color-dorado)]" : ""}`}
             >
-              <div
-                className={`text-sm tnum mb-1 ${
-                  isToday(day)
-                    ? "grid place-items-center rounded-full w-6 h-6 font-semibold"
-                    : "text-[var(--text-dim)]"
-                }`}
-                style={
-                  isToday(day)
-                    ? { background: "var(--color-dorado)", color: "#0A1828" }
-                    : {}
-                }
-              >
-                {format(day, "d")}
+              {/* Número del día + botón "+" */}
+              <div className="flex items-center justify-between mb-1">
+                <div
+                  className={`text-sm tnum ${
+                    isToday(day)
+                      ? "grid place-items-center rounded-full w-6 h-6 font-semibold"
+                      : "text-[var(--text-dim)]"
+                  }`}
+                  style={
+                    isToday(day)
+                      ? { background: "var(--color-dorado)", color: "#0A1828" }
+                      : {}
+                  }
+                >
+                  {format(day, "d")}
+                </div>
+                {/* "+" aparece en hover */}
+                <button
+                  onClick={(ev) => {
+                    ev.stopPropagation();
+                    onCreateEvent(key);
+                  }}
+                  className="opacity-0 group-hover:opacity-100 transition-opacity rounded-full p-0.5 hover:bg-[var(--color-dorado)]/20 text-[var(--text-faint)] hover:text-[var(--color-dorado)]"
+                >
+                  <Plus size={13} strokeWidth={2.5} />
+                </button>
               </div>
               <div className="space-y-1">
                 {evs.slice(0, 3).map((e) => (
-                  <div
+                  <button
                     key={e.id}
-                    className="flex items-center gap-1 text-[11px] truncate"
+                    onClick={(ev) => {
+                      ev.stopPropagation();
+                      onEditEvent(e);
+                    }}
+                    className="flex items-center gap-1 text-[11px] truncate w-full text-left hover:opacity-75 transition-opacity"
                   >
                     <span
                       className="rounded-full shrink-0"
@@ -207,7 +281,7 @@ function MonthView({
                     <span className="truncate text-[var(--text-dim)]">
                       {e.title}
                     </span>
-                  </div>
+                  </button>
                 ))}
                 {evs.length > 3 && (
                   <div className="text-[10px] text-[var(--text-faint)]">
@@ -215,21 +289,30 @@ function MonthView({
                   </div>
                 )}
               </div>
-            </button>
+            </div>
           );
         })}
       </div>
       {selected && (
         <div className="mt-6 animate-fadein">
-          <h3 className="font-serif text-2xl capitalize mb-3">
-            {format(parseISO(selected), "EEEE d 'de' MMMM", { locale: es })}
-          </h3>
+          <div className="flex items-center justify-between mb-3">
+            <h3 className="font-serif text-2xl capitalize">
+              {format(parseISO(selected), "EEEE d 'de' MMMM", { locale: es })}
+            </h3>
+            <button
+              onClick={() => onCreateEvent(selected)}
+              className="flex items-center gap-1.5 rounded-xl border border-[var(--border)] px-3 py-1.5 text-sm text-[var(--text-dim)] hover:border-[var(--color-dorado)] hover:text-[var(--color-dorado)] transition-colors"
+            >
+              <Plus size={14} />
+              Agregar evento
+            </button>
+          </div>
           {selEvents.length === 0 ? (
             <p className="text-[var(--text-faint)] italic">
               Sin eventos este día.
             </p>
           ) : (
-            <EventList events={selEvents} />
+            <EventList events={selEvents} onEdit={onEditEvent} />
           )}
         </div>
       )}
@@ -241,9 +324,13 @@ function MonthView({
 function WeekView({
   cursor,
   byDay,
+  onCreateEvent,
+  onEditEvent,
 }: {
   cursor: Date;
   byDay: Record<string, CalEvent[]>;
+  onCreateEvent: (date: string, time?: string) => void;
+  onEditEvent: (e: CalEvent) => void;
 }) {
   const days = useMemo(() => {
     const start = startOfWeek(cursor, { weekStartsOn: 1 });
@@ -261,22 +348,32 @@ function WeekView({
             key={key}
             className="bg-[var(--bg)] min-h-[420px] flex flex-col"
           >
-            <div
-              className={`px-3 py-3 border-b border-[var(--border)] ${
+            {/* Encabezado del día */}
+            <button
+              onClick={() => onCreateEvent(key)}
+              className={`group px-3 py-3 border-b border-[var(--border)] text-left w-full transition-colors hover:bg-[var(--surface)] ${
                 today ? "bg-[var(--surface)]" : ""
               }`}
             >
-              <div className="uppercase-label text-[var(--text-faint)]">
-                {format(day, "EEE", { locale: es })}
+              <div className="flex items-center justify-between">
+                <div>
+                  <div className="uppercase-label text-[var(--text-faint)]">
+                    {format(day, "EEE", { locale: es })}
+                  </div>
+                  <div
+                    className={`font-serif text-2xl tnum ${
+                      today ? "text-[var(--color-dorado)]" : ""
+                    }`}
+                  >
+                    {format(day, "d")}
+                  </div>
+                </div>
+                <Plus
+                  size={14}
+                  className="opacity-0 group-hover:opacity-60 transition-opacity text-[var(--text-faint)]"
+                />
               </div>
-              <div
-                className={`font-serif text-2xl tnum ${
-                  today ? "text-[var(--color-dorado)]" : ""
-                }`}
-              >
-                {format(day, "d")}
-              </div>
-            </div>
+            </button>
             <div className="flex-1 p-2 space-y-1.5 overflow-y-auto">
               {evs.length === 0 && (
                 <p className="text-[10px] text-[var(--text-faint)] italic px-1 py-2">
@@ -284,9 +381,10 @@ function WeekView({
                 </p>
               )}
               {evs.map((e) => (
-                <div
+                <button
                   key={e.id}
-                  className="rounded-lg border-l-2 bg-[var(--surface)] px-2 py-1.5 text-xs"
+                  onClick={() => onEditEvent(e)}
+                  className="rounded-lg border-l-2 bg-[var(--surface)] px-2 py-1.5 text-xs w-full text-left hover:brightness-110 transition-all"
                   style={{ borderLeftColor: visColor(e) }}
                 >
                   <div className="tnum text-[var(--text-faint)]">{e.start}</div>
@@ -296,7 +394,7 @@ function WeekView({
                       {e.location}
                     </div>
                   )}
-                </div>
+                </button>
               ))}
             </div>
           </div>
@@ -310,9 +408,13 @@ function WeekView({
 function DayView({
   cursor,
   byDay,
+  onCreateEvent,
+  onEditEvent,
 }: {
   cursor: Date;
   byDay: Record<string, CalEvent[]>;
+  onCreateEvent: (date: string, time?: string) => void;
+  onEditEvent: (e: CalEvent) => void;
 }) {
   const key = iso(cursor);
   const evs = byDay[key] || [];
@@ -330,7 +432,7 @@ function DayView({
 
   const evPosition = (start: string, end?: string) => {
     const [h, m] = start.split(":").map(Number);
-    const top = ((h - 7) * 60 + m) * (60 / 60); // 1px = 1min · row=60px/hr
+    const top = ((h - 7) * 60 + m) * (60 / 60);
     let height = 50;
     if (end) {
       const [eh, em] = end.split(":").map(Number);
@@ -338,6 +440,13 @@ function DayView({
     }
     return { top, height };
   };
+
+  function timeFromY(y: number): string {
+    const totalMins = Math.round(y / 60) * 60 + 7 * 60;
+    const h = Math.floor(totalMins / 60);
+    const m = totalMins % 60;
+    return `${String(Math.min(h, 20)).padStart(2, "0")}:${String(m).padStart(2, "0")}`;
+  }
 
   return (
     <div className="rounded-2xl border border-[var(--border)] overflow-hidden bg-[var(--surface)]">
@@ -354,16 +463,24 @@ function DayView({
           ))}
         </div>
 
-        {/* Columna eventos */}
-        <div className="relative">
+        {/* Columna eventos — click en franja vacía abre modal */}
+        <div
+          className="relative cursor-pointer"
+          onClick={(e) => {
+            const rect = (e.currentTarget as HTMLDivElement).getBoundingClientRect();
+            const relY = e.clientY - rect.top;
+            const time = timeFromY(relY);
+            onCreateEvent(key, time);
+          }}
+        >
           {hours.map((h) => (
             <div
               key={h}
-              className="h-[60px] border-b border-[var(--border)]"
+              className="h-[60px] border-b border-[var(--border)] hover:bg-[var(--surface-2)] transition-colors"
             />
           ))}
 
-          {/* Línea de "ahora" */}
+          {/* Línea "ahora" */}
           {isCurrentDay && minsSince7 >= 0 && minsSince7 <= 14 * 60 && (
             <div
               className="absolute left-0 right-0 flex items-center pointer-events-none z-20"
@@ -390,9 +507,13 @@ function DayView({
           {evs.map((e) => {
             const { top, height } = evPosition(e.start, e.end);
             return (
-              <div
+              <button
                 key={e.id}
-                className="absolute left-2 right-2 rounded-lg border-l-[3px] bg-[var(--surface-2)] p-2 shadow-sm overflow-hidden"
+                onClick={(ev) => {
+                  ev.stopPropagation();
+                  onEditEvent(e);
+                }}
+                className="absolute left-2 right-2 rounded-lg border-l-[3px] bg-[var(--surface-2)] p-2 shadow-sm overflow-hidden text-left hover:brightness-110 transition-all z-10"
                 style={{
                   top,
                   height,
@@ -413,14 +534,14 @@ function DayView({
                     <MapPin size={11} /> {e.location}
                   </div>
                 )}
-              </div>
+              </button>
             );
           })}
 
           {evs.length === 0 && (
-            <div className="absolute inset-0 grid place-items-center">
+            <div className="absolute inset-0 grid place-items-center pointer-events-none">
               <p className="text-[var(--text-faint)] italic">
-                Sin eventos este día.
+                Click en cualquier franja para agregar un evento.
               </p>
             </div>
           )}
@@ -430,13 +551,20 @@ function DayView({
   );
 }
 
-function EventList({ events }: { events: CalEvent[] }) {
+function EventList({
+  events,
+  onEdit,
+}: {
+  events: CalEvent[];
+  onEdit: (e: CalEvent) => void;
+}) {
   return (
     <div className="space-y-2">
       {events.map((e) => (
-        <div
+        <button
           key={e.id}
-          className="flex items-start gap-3 rounded-xl border border-[var(--border)] bg-[var(--surface)] p-4"
+          onClick={() => onEdit(e)}
+          className="flex items-start gap-3 rounded-xl border border-[var(--border)] bg-[var(--surface)] p-4 w-full text-left hover:border-[var(--border-strong)] hover:bg-[var(--surface-2)] transition-colors"
         >
           <span
             className="mt-1 rounded-full shrink-0"
@@ -462,7 +590,7 @@ function EventList({ events }: { events: CalEvent[] }) {
             <VisibilityBadge v={e.visibleTo} />
             <AvatarStack ids={e.visibleTo} size={22} />
           </div>
-        </div>
+        </button>
       ))}
     </div>
   );
