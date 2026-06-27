@@ -1,0 +1,141 @@
+@import "tailwindcss";
+
+@theme {
+  /* Paleta de marca Firma Legal S.B.S */
+  --color-marino: #13284e;
+  --color-marino-900: #0a1828;
+  --color-marino-800: #0e1f3a;
+  --color-marino-700: #13284e;
+  --color-marino-600: #1c3766;
+  --color-marino-500: #2a4a82;
+  --color-dorado: #c9a84c;
+  --color-dorado-soft: #d9bd6e;
+  --color-dorado-dim: #8a7536;
+  --color-crema: #f7f6f2;
+  --color-crema-dim: #d8d6cd;
+
+  /* Estados / semáforo (tonos apagados, no saturados) */
+  --color-rojo: #d05a55;
+  --color-ambar: #d6a849;
+  --color-verde: #5a9d72;
+
+  /* Avatares por socio */
+  --color-nelson: #2a4a82;
+  --color-estela: #c9a84c;
+  --color-fatima: #5a9d72;
+
+  --font-serif: "Fraunces", Georgia, serif;
+  --font-sans: "Inter", system-ui, sans-serif;
+}
+
+/* Modo medio (default) — fondo azul marino, identidad SBS */
+:root,
+:root[data-theme="medio"] {
+  --bg: var(--color-marino-900);
+  --surface: var(--color-marino-800);
+  --surface-2: var(--color-marino-700);
+  --text: var(--color-crema);
+  --text-dim: #8fa0bd;
+  --text-faint: #5a6b8a;
+  --border: rgba(201, 168, 76, 0.12);
+  --border-strong: rgba(201, 168, 76, 0.28);
+  color-scheme: dark;
+}
+
+/* Modo claro — fondo marfil */
+:root[data-theme="claro"] {
+  --bg: var(--color-crema);
+  --surface: #ffffff;
+  --surface-2: #efece2;
+  --text: var(--color-marino-700);
+  --text-dim: #5a6680;
+  --text-faint: #95a0b5;
+  --border: rgba(19, 40, 78, 0.1);
+  --border-strong: rgba(19, 40, 78, 0.22);
+  color-scheme: light;
+}
+
+/* Modo oscuro — fondo negro profundo */
+:root[data-theme="oscuro"] {
+  --bg: #050608;
+  --surface: #0e1117;
+  --surface-2: #161a22;
+  --text: #e8e6df;
+  --text-dim: #8b8e96;
+  --text-faint: #555861;
+  --border: rgba(201, 168, 76, 0.1);
+  --border-strong: rgba(201, 168, 76, 0.24);
+  color-scheme: dark;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+  margin: 0;
+}
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+  font-feature-settings: "ss01", "cv01";
+}
+
+.font-serif {
+  font-family: var(--font-serif);
+}
+
+.tnum {
+  font-variant-numeric: tabular-nums;
+}
+
+/* Scrollbar discreto */
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+::-webkit-scrollbar-thumb {
+  background: var(--border-strong);
+  border-radius: 6px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+/* Línea dorada — guiño notarial */
+.gold-rule {
+  height: 1px;
+  background: linear-gradient(
+    90deg,
+    var(--color-dorado) 0%,
+    transparent 60%
+  );
+  opacity: 0.5;
+}
+
+.uppercase-label {
+  text-transform: uppercase;
+  letter-spacing: 0.18em;
+  font-size: 0.68rem;
+  font-weight: 600;
+}
+
+@keyframes fadein {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+.animate-fadein {
+  animation: fadein 0.35s ease both;
+}
