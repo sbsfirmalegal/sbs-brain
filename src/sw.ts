@@ -1,0 +1,67 @@
+/// <reference lib="webworker" />
+import { precacheAndRoute } from "workbox-precaching";
+
+declare let self: ServiceWorkerGlobalScope;
+
+// Precache de los assets generados por el build (PWA / offline)
+precacheAndRoute(self.__WB_MANIFEST);
+
+// Activar el SW nuevo de inmediato
+self.addEventListener("install", () => {
+  self.skipWaiting();
+});
+self.addEventListener("activate", (event) => {
+  event.waitUntil(self.clients.claim());
+});
+
+// ─── PUSH ───
+interface PushPayload {
+  title?: string;
+  body?: string;
+  url?: string;
+  tag?: string;
+}
+
+self.addEventListener("push", (event) => {
+  let payload: PushPayload = {};
+  try {
+    payload = event.data?.json() ?? {};
+  } catch {
+    payload = { title: "SBS Cronograma", body: event.data?.text() ?? "" };
+  }
+
+  const title = payload.title || "SBS Cronograma";
+  const options: NotificationOptions = {
+    body: payload.body || "",
+    icon: "/icon-192.svg",
+    badge: "/icon-192.svg",
+    data: { url: payload.url || "/" },
+    tag: payload.tag,
+    // @ts-expect-error vibrate no está tipado en todos los lib.dom
+    vibrate: [80, 40, 80],
+  };
+
+  event.waitUntil(self.registration.showNotification(title, options));
+});
+
+// ─── CLICK EN LA NOTIFICACIÓN ───
+self.addEventListener("notificationclick", (event) => {
+  event.notification.close();
+  const url = (event.notification.data?.url as string) || "/";
+
+  event.waitUntil(
+    self.clients
+      .matchAll({ type: "window", includeUncontrolled: true })
+      .then((clientList) => {
+        // Si ya hay una ventana abierta, enfocarla y navegar
+        for (const client of clientList) {
+          if ("focus" in client) {
+            client.navigate(url);
+            return client.focus();
+          }
+        }
+        // Si no, abrir una nueva
+        return self.clients.openWindow(url);
+      })
+  );
+});

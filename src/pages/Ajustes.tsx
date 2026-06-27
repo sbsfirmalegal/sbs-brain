@@ -1,9 +1,24 @@
-import { useState } from "react";
-import { Eye, EyeOff, KeyRound, Loader2, ShieldCheck } from "lucide-react";
+import { useEffect, useState } from "react";
+import {
+  Eye,
+  EyeOff,
+  KeyRound,
+  Loader2,
+  ShieldCheck,
+  Bell,
+  BellOff,
+} from "lucide-react";
 import { useStore } from "../store/store";
 import { useAuth } from "../contexts/AuthContext";
 import { SectionTitle, Card, Avatar } from "../components/ui";
 import { USERS } from "../data/users";
+import {
+  pushSupported,
+  isSubscribed,
+  subscribeToPush,
+  unsubscribeFromPush,
+  notificationPermission,
+} from "../lib/push";
 
 export function Ajustes() {
   const { currentUser, theme, toggleTheme } = useStore();
@@ -61,6 +76,11 @@ export function Ajustes() {
         <PasswordManager onSave={changePassword} />
       </Card>
 
+      {/* Notificaciones push */}
+      <Card className="p-5 mb-4">
+        <PushToggle userUuid={session?.user.id ?? null} />
+      </Card>
+
       {/* Apariencia */}
       <Card className="p-5">
         <div className="flex items-center justify-between gap-3">
@@ -79,6 +99,119 @@ export function Ajustes() {
           </button>
         </div>
       </Card>
+    </div>
+  );
+}
+
+function PushToggle({ userUuid }: { userUuid: string | null }) {
+  const [supported] = useState(pushSupported());
+  const [active, setActive] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [checking, setChecking] = useState(true);
+  const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
+
+  useEffect(() => {
+    if (!supported) {
+      setChecking(false);
+      return;
+    }
+    isSubscribed()
+      .then(setActive)
+      .finally(() => setChecking(false));
+  }, [supported]);
+
+  async function toggle() {
+    if (!userUuid) return;
+    setBusy(true);
+    setMsg(null);
+    if (active) {
+      const err = await unsubscribeFromPush();
+      setBusy(false);
+      if (err) {
+        setMsg({ ok: false, text: err });
+      } else {
+        setActive(false);
+        setMsg({ ok: true, text: "Notificaciones desactivadas en este dispositivo." });
+      }
+    } else {
+      const err = await subscribeToPush(userUuid);
+      setBusy(false);
+      if (err) {
+        setMsg({ ok: false, text: err });
+      } else {
+        setActive(true);
+        setMsg({ ok: true, text: "¡Listo! Vas a recibir notificaciones en este dispositivo." });
+      }
+    }
+  }
+
+  const denied = notificationPermission() === "denied";
+
+  return (
+    <div>
+      <div className="flex items-start gap-3 mb-4">
+        <span
+          className="grid place-items-center rounded-lg shrink-0"
+          style={{
+            width: 36,
+            height: 36,
+            background: "var(--color-dorado)1a",
+            color: "var(--color-dorado)",
+            border: "1px solid var(--color-dorado)55",
+          }}
+        >
+          {active ? <Bell size={18} /> : <BellOff size={18} />}
+        </span>
+        <div className="flex-1">
+          <div className="font-medium">Notificaciones push</div>
+          <p className="text-sm text-[var(--text-dim)] italic mt-0.5">
+            Recibí recordatorios de eventos, reuniones, tareas y mensajes del
+            chat directamente en este dispositivo.
+          </p>
+        </div>
+      </div>
+
+      {!supported ? (
+        <p className="text-xs text-[var(--text-faint)]">
+          Este navegador no soporta notificaciones push. Asegurate de abrir la
+          app instalada en la pantalla de inicio.
+        </p>
+      ) : denied && !active ? (
+        <p className="text-xs text-[var(--color-rojo)]">
+          Bloqueaste las notificaciones. Activalas desde la configuración del
+          navegador (candado en la barra de direcciones → Notificaciones).
+        </p>
+      ) : (
+        <button
+          onClick={toggle}
+          disabled={busy || checking || !userUuid}
+          className="flex items-center gap-2 rounded-xl px-4 py-2 text-sm font-semibold disabled:opacity-40"
+          style={
+            active
+              ? {
+                  background: "transparent",
+                  color: "var(--text-dim)",
+                  border: "1px solid var(--border)",
+                }
+              : { background: "var(--color-dorado)", color: "#0A1828" }
+          }
+        >
+          {(busy || checking) && <Loader2 size={14} className="animate-spin" />}
+          {!busy && !checking &&
+            (active ? <BellOff size={14} /> : <Bell size={14} />)}
+          {active ? "Desactivar en este dispositivo" : "Activar notificaciones"}
+        </button>
+      )}
+
+      {msg && (
+        <p
+          className={`text-xs mt-3 ${
+            msg.ok ? "text-[var(--color-verde)]" : "text-[var(--color-rojo)]"
+          }`}
+        >
+          {msg.text}
+        </p>
+      )}
     </div>
   );
 }
