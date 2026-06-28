@@ -159,6 +159,10 @@ export function rowToHabit(r: any, m: ProfileMap): Habit {
     completions: r.completions ?? [],
     createdAt: r.created_at,
     archived: r.archived ?? false,
+    category: r.category ?? undefined,
+    priority: r.priority ?? undefined,
+    recommendedTime: r.recommended_time ?? undefined,
+    estimatedMinutes: r.estimated_minutes ?? undefined,
   };
 }
 export function habitToRow(h: Partial<Habit>, m: ProfileMap) {
@@ -172,6 +176,10 @@ export function habitToRow(h: Partial<Habit>, m: ProfileMap) {
   if (h.weeklyTarget !== undefined) row.weekly_target = h.weeklyTarget ?? null;
   if (h.completions !== undefined) row.completions = h.completions;
   if (h.archived !== undefined) row.archived = h.archived;
+  if (h.category !== undefined) row.category = h.category ?? null;
+  if (h.priority !== undefined) row.priority = h.priority ?? null;
+  if (h.recommendedTime !== undefined) row.recommended_time = h.recommendedTime ?? null;
+  if (h.estimatedMinutes !== undefined) row.estimated_minutes = h.estimatedMinutes ?? null;
   return row;
 }
 

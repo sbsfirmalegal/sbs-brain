@@ -185,8 +185,18 @@ create table if not exists public.habits (
   weekly_target int,
   completions date[] not null default '{}',
   archived boolean not null default false,
-  created_at timestamptz not null default now()
+  created_at timestamptz not null default now(),
+  category text check (category in ('profesional','intelectual','salud','personal')),
+  priority text check (priority in ('alta','media','baja')),
+  recommended_time text,
+  estimated_minutes int
 );
+
+-- Migración: agrega columnas nuevas si la tabla ya existía sin ellas
+alter table public.habits add column if not exists category text check (category in ('profesional','intelectual','salud','personal'));
+alter table public.habits add column if not exists priority text check (priority in ('alta','media','baja'));
+alter table public.habits add column if not exists recommended_time text;
+alter table public.habits add column if not exists estimated_minutes int;
 
 alter table public.habits enable row level security;
 

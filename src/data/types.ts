@@ -130,6 +130,8 @@ export interface ChatMessage {
 
 export type HabitFrequency = "diario" | "semanal";
 
+export type HabitCategory = "profesional" | "intelectual" | "salud" | "personal";
+
 export interface Habit {
   id: string;
   name: string;
@@ -142,6 +144,10 @@ export interface Habit {
   completions: string[];
   createdAt: string;
   archived?: boolean;
+  category?: HabitCategory;
+  priority?: Priority;
+  recommendedTime?: string; // HH:mm
+  estimatedMinutes?: number;
 }
 
 export type GoalScope = "firma" | "personal";
