@@ -11,15 +11,30 @@ import {
   Trash2,
 } from "lucide-react";
 import { useStore } from "../store/store";
-import { SectionTitle, AvatarStack, VisibilityBadge } from "../components/ui";
+import { SectionTitle, AvatarStack, VisibilityBadge, Card } from "../components/ui";
 import { fmtDay, fmtWeekday, todayISO } from "../lib/dates";
 import { visibilityLevel } from "../components/ui";
-import type { Meeting, AgreementKind, Priority, UserId } from "../data/types";
-import { USERS } from "../data/users";
+import type {
+  Meeting,
+  MeetingType,
+  AgreementKind,
+  Priority,
+  UserId,
+  Visibility,
+} from "../data/types";
+import { ALL_USERS, USER_LIST, USERS } from "../data/users";
+
+const MEETING_TYPE_LABEL: Record<MeetingType, string> = {
+  ordinaria: "ordinaria",
+  extraordinaria: "extraordinaria",
+  informal: "informal",
+  rutina_estudio: "rutina de estudio",
+};
 
 export function Reuniones() {
-  const { data, visible } = useStore();
+  const { data, currentUser, visible, addMeeting } = useStore();
   const [openId, setOpenId] = useState<string | null>(null);
+  const [creating, setCreating] = useState(false);
   const meetings = visible(data.meetings).sort((a, b) =>
     (b.date + b.start).localeCompare(a.date + a.start)
   );
@@ -30,6 +45,24 @@ export function Reuniones() {
       <SectionTitle kicker="Reuniones" count={`${meetings.length} totales`}>
         Bitácora de <span className="italic text-[var(--color-dorado)]">sesiones</span>
       </SectionTitle>
+
+      {creating ? (
+        <NewMeetingForm
+          onSave={async (m) => {
+            const created = await addMeeting(m);
+            if (created) setOpenId(created.id);
+            setCreating(false);
+          }}
+          onCancel={() => setCreating(false)}
+        />
+      ) : (
+        <button
+          onClick={() => setCreating(true)}
+          className="w-full flex items-center justify-center gap-2 rounded-xl border border-dashed border-[var(--border-strong)] py-3 mb-6 text-sm text-[var(--text-dim)] hover:text-[var(--color-dorado)] hover:border-[var(--color-dorado)]"
+        >
+          <Plus size={16} /> Nueva reunión
+        </button>
+      )}
 
       <div className="space-y-1">
         {meetings.map((m) => {
@@ -163,7 +196,7 @@ function MeetingDetail({
           <div className="flex items-center gap-2">
             <VisibilityBadge v={meeting.visibleTo} />
             <span className="uppercase-label text-[var(--text-faint)]">
-              {meeting.type}
+              {MEETING_TYPE_LABEL[meeting.type]}
             </span>
           </div>
           <button onClick={onClose} className="text-[var(--text-faint)] hover:text-[var(--text)]">
@@ -355,6 +388,130 @@ function MeetingDetail({
         </div>
       </motion.div>
     </motion.div>
+  );
+}
+
+function NewMeetingForm({
+  onSave,
+  onCancel,
+}: {
+  onSave: (m: Partial<Meeting> & { title: string }) => void;
+  onCancel: () => void;
+}) {
+  const { currentUser } = useStore();
+  const [title, setTitle] = useState("");
+  const [type, setType] = useState<MeetingType>("ordinaria");
+  const [date, setDate] = useState(todayISO());
+  const [start, setStart] = useState("09:00");
+  const [attendees, setAttendees] = useState<Visibility>(
+    currentUser ? [currentUser] : []
+  );
+
+  function toggleAttendee(u: UserId) {
+    setAttendees((v) => (v.includes(u) ? v.filter((x) => x !== u) : [...v, u]));
+  }
+
+  function save() {
+    const t = title.trim();
+    if (!t) return;
+    onSave({
+      title: t,
+      type,
+      date,
+      start,
+      attendees: attendees.length ? attendees : currentUser ? [currentUser] : [],
+      visibleTo: attendees.length ? attendees : currentUser ? [currentUser] : [],
+    });
+  }
+
+  return (
+    <Card className="p-5 mb-6">
+      <div className="flex items-center justify-between mb-3">
+        <span className="uppercase-label text-[var(--text-faint)]">Nueva reunión</span>
+        <button onClick={onCancel} className="text-[var(--text-faint)] hover:text-[var(--text)]">
+          <X size={18} />
+        </button>
+      </div>
+
+      <input
+        autoFocus
+        value={title}
+        onChange={(e) => setTitle(e.target.value)}
+        onKeyDown={(e) => e.key === "Enter" && save()}
+        placeholder="¿Sobre qué es la reunión?"
+        className="w-full bg-transparent text-lg font-serif outline-none placeholder:text-[var(--text-faint)] py-2 border-b border-[var(--border)] mb-3"
+      />
+
+      <div className="flex flex-wrap gap-2 items-center mb-3">
+        <input
+          type="date"
+          value={date}
+          onChange={(e) => setDate(e.target.value)}
+          className="rounded-lg border border-[var(--border)] bg-[var(--surface-2)] px-3 py-2 text-sm"
+        />
+        <input
+          type="time"
+          value={start}
+          onChange={(e) => setStart(e.target.value)}
+          className="rounded-lg border border-[var(--border)] bg-[var(--surface-2)] px-3 py-2 text-sm tnum"
+        />
+        <select
+          value={type}
+          onChange={(e) => setType(e.target.value as MeetingType)}
+          className="rounded-lg border border-[var(--border)] bg-[var(--surface-2)] px-3 py-2 text-sm"
+        >
+          <option value="ordinaria">Ordinaria</option>
+          <option value="extraordinaria">Extraordinaria</option>
+          <option value="informal">Informal</option>
+          <option value="rutina_estudio">Rutina de estudio</option>
+        </select>
+      </div>
+
+      <div className="flex items-center gap-2 mb-4">
+        <span className="uppercase-label text-[var(--text-faint)] w-24">Asistentes</span>
+        <div className="flex gap-2 flex-wrap">
+          {USER_LIST.map((u) => (
+            <button
+              key={u.id}
+              onClick={() => toggleAttendee(u.id)}
+              className={`flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs transition-all ${
+                attendees.includes(u.id)
+                  ? "border-[var(--color-dorado)] text-[var(--text)]"
+                  : "border-[var(--border)] text-[var(--text-faint)]"
+              }`}
+            >
+              <span
+                className="rounded-full"
+                style={{
+                  width: 14,
+                  height: 14,
+                  background: attendees.includes(u.id) ? u.color : "transparent",
+                  border: `1px solid ${u.color}`,
+                }}
+              />
+              {u.name}
+            </button>
+          ))}
+          <button
+            onClick={() => setAttendees([...ALL_USERS])}
+            className="uppercase-label text-[var(--text-dim)] hover:text-[var(--color-dorado)] px-2"
+          >
+            Los 3
+          </button>
+        </div>
+      </div>
+
+      <div className="flex items-center justify-end pt-3 border-t border-[var(--border)]">
+        <button
+          onClick={save}
+          disabled={!title.trim()}
+          className="rounded-xl px-5 py-2.5 font-semibold text-sm disabled:opacity-40 transition-opacity"
+          style={{ background: "var(--color-dorado)", color: "#0A1828" }}
+        >
+          Crear reunión
+        </button>
+      </div>
+    </Card>
   );
 }
 

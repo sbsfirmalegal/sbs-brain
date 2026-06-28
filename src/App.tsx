@@ -19,6 +19,7 @@ import { Habitos } from "./pages/Habitos";
 import { Metas } from "./pages/Metas";
 import { Bandeja } from "./pages/Bandeja";
 import { Ajustes } from "./pages/Ajustes";
+import { Papelera } from "./pages/Papelera";
 
 function AppLoading() {
   return (
@@ -72,6 +73,7 @@ function AppRoutes() {
           <Route path="/habitos" element={<Habitos />} />
           <Route path="/metas" element={<Metas />} />
           <Route path="/bandeja" element={<Bandeja />} />
+          <Route path="/papelera" element={<Papelera />} />
           <Route path="/ajustes" element={<Ajustes />} />
         </Route>
       </Route>

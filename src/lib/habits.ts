@@ -219,7 +219,14 @@ export function disciplineIndex({ habits, tasks, goals }: DisciplineInputs): Dis
       ).length / activeGoals.length
     : 1;
 
-  const tareasYMetas = Math.round(((criticalOnTrack + goalsProgressing) / 2) * 100);
+  const dueLast7 = tasks.filter((t) => t.due && window.includes(t.due));
+  const completionRate7d = dueLast7.length
+    ? dueLast7.filter((t) => t.done).length / dueLast7.length
+    : 1;
+
+  const tareasYMetas = Math.round(
+    ((criticalOnTrack + goalsProgressing + completionRate7d) / 3) * 100
+  );
 
   const score = Math.round(
     0.35 * ejecucionHoy + 0.3 * consistenciaSemanal + 0.2 * rachasActivas + 0.15 * tareasYMetas

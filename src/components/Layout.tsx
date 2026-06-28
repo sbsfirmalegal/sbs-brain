@@ -18,6 +18,7 @@ import {
   PanelLeftOpen,
   Menu,
   Bell,
+  Trash2,
 } from "lucide-react";
 import { useStore } from "../store/store";
 import { USERS } from "../data/users";
@@ -139,6 +140,20 @@ export function Layout() {
         </nav>
 
         <div className="mt-auto flex flex-col gap-2">
+          <NavLink
+            to="/papelera"
+            title="Papelera"
+            className={({ isActive }) =>
+              `flex items-center gap-2 uppercase-label ${
+                isActive
+                  ? "text-[var(--color-dorado)]"
+                  : "text-[var(--text-dim)] hover:text-[var(--color-dorado)]"
+              } ${sidebarCollapsed ? "justify-center" : ""}`
+            }
+          >
+            <Trash2 size={15} />
+            {!sidebarCollapsed && "Papelera"}
+          </NavLink>
           <NavLink
             to="/ajustes"
             title="Ajustes"
@@ -284,6 +299,20 @@ export function Layout() {
               >
                 <Bell size={22} />
                 <span className="text-[11px]">Bandeja</span>
+              </NavLink>
+              <NavLink
+                to="/papelera"
+                onClick={() => setMoreOpen(false)}
+                className={({ isActive }) =>
+                  `flex flex-col items-center gap-1.5 rounded-xl py-3 ${
+                    isActive
+                      ? "bg-[var(--surface-2)] text-[var(--color-dorado)]"
+                      : "text-[var(--text-dim)]"
+                  }`
+                }
+              >
+                <Trash2 size={22} />
+                <span className="text-[11px]">Papelera</span>
               </NavLink>
               <NavLink
                 to="/ajustes"

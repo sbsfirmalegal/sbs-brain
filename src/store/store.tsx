@@ -18,9 +18,11 @@ import type {
   Notification,
   NotifKind,
   Task,
+  TrashKind,
   UserId,
 } from "../data/types";
-import { todayISO } from "../lib/dates";
+import { todayISO, iso } from "../lib/dates";
+import { parseISO } from "date-fns";
 import { useAuth } from "../contexts/AuthContext";
 import { supabase } from "../lib/supabase";
 import { loadProfileMap, type ProfileMap } from "../lib/profiles";
@@ -49,6 +51,16 @@ const THEMES: Theme[] = ["claro", "medio", "oscuro"];
 const THEME_KEY = "sbs-theme-v1";
 const SIDEBAR_KEY = "sbs-sidebar-v1";
 const ALL_USERS: UserId[] = ["nelson", "estela", "fatima"];
+export const TRASH_RETENTION_DAYS = 15;
+
+const TRASH_TABLE: Record<TrashKind, string> = {
+  task: "tasks",
+  event: "events",
+  meeting: "meetings",
+  note: "notes",
+  habit: "habits",
+  goal: "goals",
+};
 
 const emptyData: AppData = {
   events: [],
@@ -76,6 +88,8 @@ interface Ctx {
   toggleTask: (id: string) => Promise<void>;
   updateTask: (id: string, patch: Partial<Task>) => Promise<void>;
   deleteTask: (id: string) => Promise<void>;
+  postponeTask: (id: string, newDue: string) => Promise<void>;
+  convertTaskToHabit: (id: string) => Promise<Habit | null>;
   // events
   addEvent: (e: Partial<CalEvent> & { title: string; owner: UserId }) => Promise<CalEvent | null>;
   updateEvent: (id: string, patch: Partial<CalEvent>) => Promise<void>;
@@ -88,6 +102,10 @@ interface Ctx {
   addNote: (n: Partial<Note> & { title: string; owner: UserId }) => Promise<Note | null>;
   updateNote: (id: string, patch: Partial<Note>) => Promise<void>;
   deleteNote: (id: string) => Promise<void>;
+  // papelera
+  restoreItem: (kind: TrashKind, id: string) => Promise<void>;
+  purgeItem: (kind: TrashKind, id: string) => Promise<void>;
+  trashed: <T extends { visibleTo: UserId[]; deletedAt?: string }>(items: T[]) => T[];
   // chat
   sendMessage: (text: string) => Promise<void>;
   reactMessage: (id: string, emoji: string) => Promise<void>;
@@ -247,6 +265,34 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     };
   }, [profile]);
 
+  /* ─────────── Papelera: purga automática tras TRASH_RETENTION_DAYS ─────────── */
+  useEffect(() => {
+    if (!currentUser) return;
+
+    const purgeExpired = async () => {
+      const cutoff = Date.now() - TRASH_RETENTION_DAYS * 24 * 60 * 60 * 1000;
+      const tables: { table: string; rows: { id: string; deletedAt?: string }[] }[] = [
+        { table: "tasks", rows: data.tasks },
+        { table: "events", rows: data.events },
+        { table: "meetings", rows: data.meetings },
+        { table: "notes", rows: data.notes },
+        { table: "habits", rows: data.habits },
+        { table: "goals", rows: data.goals },
+      ];
+      for (const { table, rows } of tables) {
+        const expiredIds = rows
+          .filter((r) => r.deletedAt && new Date(r.deletedAt).getTime() < cutoff)
+          .map((r) => r.id);
+        if (expiredIds.length) {
+          await supabase.from(table).delete().in("id", expiredIds);
+        }
+      }
+    };
+    purgeExpired();
+    const i = setInterval(purgeExpired, 60 * 60 * 1000);
+    return () => clearInterval(i);
+  }, [currentUser, data.tasks, data.events, data.meetings, data.notes, data.habits, data.goals]);
+
   /* ─────────── Notificaciones derivadas (locales por usuario) ─────────── */
   useEffect(() => {
     if (!currentUser || !profileMapRef.current) return;
@@ -319,6 +365,47 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     };
     const u = () => currentUser as UserId;
 
+    const createTask = async (t: Partial<Task> & { title: string; owner: UserId }) => {
+      const m = requireMap();
+      const visibleTo = t.visibleTo ?? [t.owner];
+      const row = taskToRow(
+        {
+          ...t,
+          done: false,
+          visibleTo,
+          due: t.due ?? null,
+          priority: t.priority ?? "media",
+          postponeCount: 0,
+        },
+        m
+      );
+      const { data: ins } = await supabase
+        .from("tasks")
+        .insert(row)
+        .select()
+        .single();
+      const me = currentUser;
+      if (ins && me && t.owner !== me) {
+        await supabase.from("notifications").insert({
+          kind: "tarea-asignada",
+          recipient: m.uuidOf[t.owner],
+          from_user: m.uuidOf[me],
+          title: `Nueva tarea: ${t.title}`,
+          body: t.due ? `Vence: ${t.due}` : null,
+          link: "/tareas",
+          ref_id: ins.id,
+          read: false,
+        });
+      }
+      return ins ? rowToTask(ins, m) : null;
+    };
+
+    const nextDue = (due: string | null, recurrence: Task["recurrence"]) => {
+      const base = due ? parseISO(due) : new Date();
+      base.setDate(base.getDate() + (recurrence === "semanal" ? 7 : 1));
+      return iso(base);
+    };
+
     return {
       data,
       currentUser,
@@ -331,39 +418,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       toggleSidebar: () => setSidebarCollapsed((s) => !s),
 
       /* ─── TASKS ─── */
-      addTask: async (t) => {
-        const m = requireMap();
-        const visibleTo = t.visibleTo ?? [t.owner];
-        const row = taskToRow(
-          {
-            ...t,
-            done: false,
-            visibleTo,
-            due: t.due ?? null,
-            priority: t.priority ?? "media",
-          },
-          m
-        );
-        const { data: ins } = await supabase
-          .from("tasks")
-          .insert(row)
-          .select()
-          .single();
-        const me = currentUser;
-        if (ins && me && t.owner !== me) {
-          await supabase.from("notifications").insert({
-            kind: "tarea-asignada",
-            recipient: m.uuidOf[t.owner],
-            from_user: m.uuidOf[me],
-            title: `Nueva tarea: ${t.title}`,
-            body: t.due ? `Vence: ${t.due}` : null,
-            link: "/tareas",
-            ref_id: ins.id,
-            read: false,
-          });
-        }
-        return ins ? rowToTask(ins, m) : null;
-      },
+      addTask: createTask,
       toggleTask: async (id) => {
         const t = data.tasks.find((x) => x.id === id);
         if (!t) return;
@@ -372,13 +427,64 @@ export function StoreProvider({ children }: { children: ReactNode }) {
           .from("tasks")
           .update({ done, completed_at: done ? todayISO() : null })
           .eq("id", id);
+        // tarea recurrente cumplida: se genera la siguiente instancia automáticamente
+        if (done && t.recurrence) {
+          await createTask({
+            title: t.title,
+            owner: t.owner,
+            visibleTo: t.visibleTo,
+            priority: t.priority,
+            area: t.area,
+            folio: t.folio,
+            recurrence: t.recurrence,
+            linkedHabitId: t.linkedHabitId,
+            due: nextDue(t.due, t.recurrence),
+            subtasks: t.subtasks?.map((s) => ({ ...s, done: false })),
+          });
+        }
       },
       updateTask: async (id, patch) => {
         const m = requireMap();
         await supabase.from("tasks").update(taskToRow(patch, m)).eq("id", id);
       },
       deleteTask: async (id) => {
-        await supabase.from("tasks").delete().eq("id", id);
+        await supabase.from("tasks").update({ deleted_at: new Date().toISOString() }).eq("id", id);
+      },
+      postponeTask: async (id, newDue) => {
+        const t = data.tasks.find((x) => x.id === id);
+        if (!t) return;
+        await supabase
+          .from("tasks")
+          .update({ due: newDue, postpone_count: (t.postponeCount ?? 0) + 1 })
+          .eq("id", id);
+      },
+      convertTaskToHabit: async (id) => {
+        const m = requireMap();
+        const t = data.tasks.find((x) => x.id === id);
+        if (!t) return null;
+        const { data: ins } = await supabase
+          .from("habits")
+          .insert(
+            habitToRow(
+              {
+                name: t.title,
+                owner: t.owner,
+                visibleTo: t.visibleTo,
+                frequency: t.recurrence === "semanal" ? "semanal" : "diario",
+                completions: [],
+                priority: t.priority,
+              },
+              m
+            )
+          )
+          .select()
+          .single();
+        if (!ins) return null;
+        await supabase
+          .from("tasks")
+          .update({ converted_to_habit_id: ins.id, done: true, completed_at: todayISO() })
+          .eq("id", id);
+        return rowToHabit(ins, m);
       },
 
       /* ─── EVENTS ─── */
@@ -406,7 +512,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         await supabase.from("events").update(eventToRow(patch, m)).eq("id", id);
       },
       deleteEvent: async (id) => {
-        await supabase.from("events").delete().eq("id", id);
+        await supabase.from("events").update({ deleted_at: new Date().toISOString() }).eq("id", id);
       },
 
       /* ─── MEETINGS ─── */
@@ -439,7 +545,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         await supabase.from("meetings").update(meetingToRow(patch, m)).eq("id", id);
       },
       deleteMeeting: async (id) => {
-        await supabase.from("meetings").delete().eq("id", id);
+        await supabase.from("meetings").update({ deleted_at: new Date().toISOString() }).eq("id", id);
       },
 
       /* ─── NOTES ─── */
@@ -470,7 +576,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         await supabase.from("notes").update(row).eq("id", id);
       },
       deleteNote: async (id) => {
-        await supabase.from("notes").delete().eq("id", id);
+        await supabase.from("notes").update({ deleted_at: new Date().toISOString() }).eq("id", id);
       },
 
       /* ─── CHAT ─── */
@@ -564,7 +670,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         await supabase.from("habits").update(habitToRow(patch, m)).eq("id", id);
       },
       deleteHabit: async (id) => {
-        await supabase.from("habits").delete().eq("id", id);
+        await supabase.from("habits").update({ deleted_at: new Date().toISOString() }).eq("id", id);
       },
 
       /* ─── GOALS ─── */
@@ -594,12 +700,26 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         await supabase.from("goals").update(goalToRow(patch, m)).eq("id", id);
       },
       deleteGoal: async (id) => {
-        await supabase.from("goals").delete().eq("id", id);
+        await supabase.from("goals").update({ deleted_at: new Date().toISOString() }).eq("id", id);
       },
+
+      /* ─── PAPELERA ─── */
+      restoreItem: async (kind, id) => {
+        await supabase.from(TRASH_TABLE[kind]).update({ deleted_at: null }).eq("id", id);
+      },
+      purgeItem: async (kind, id) => {
+        await supabase.from(TRASH_TABLE[kind]).delete().eq("id", id);
+      },
+      trashed: (items) =>
+        items.filter(
+          (it) => (!currentUser || it.visibleTo.includes(u())) && !!it.deletedAt
+        ),
 
       /* ─── VISIBILITY ─── */
       visible: (items) =>
-        items.filter((it) => !currentUser || it.visibleTo.includes(u())),
+        items.filter(
+          (it) => (!currentUser || it.visibleTo.includes(u())) && !(it as any).deletedAt
+        ),
     };
   }, [data, currentUser, theme, sidebarCollapsed, syncing, signOut]);
 

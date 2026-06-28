@@ -28,7 +28,8 @@ import { useStore } from "../store/store";
 import { SectionTitle, VisibilityBadge, Chip } from "../components/ui";
 import { fmtDay } from "../lib/dates";
 import { filterNotes, monthlyStats, unprocessedIdeas, allTags } from "../lib/notes";
-import type { ConvertibleKind, Note, NoteType, Source, SourceKind } from "../data/types";
+import type { ConvertibleKind, DecisionMeta, Note, NoteType, Source, SourceKind } from "../data/types";
+import { REFLEXION_TEMPLATE } from "../data/types";
 import {
   detectSourceKind,
   SOURCE_META,
@@ -120,7 +121,7 @@ export function Notas() {
   return (
     <div>
       <SectionTitle kicker="Notas" count={`${allNotes.length}`}>
-        Tu <span className="italic text-[var(--color-dorado)]">segundo cerebro</span>
+        Notas
       </SectionTitle>
 
       {/* Captura rápida universal */}
@@ -406,6 +407,14 @@ function NoteEditor({
         className="w-full bg-transparent font-serif text-2xl outline-none mb-3"
         placeholder="Título…"
       />
+      {note.type === "reflexion" && !body.trim() && (
+        <button
+          onClick={() => setBody(REFLEXION_TEMPLATE)}
+          className="uppercase-label mb-2 rounded-md border border-[var(--border)] px-2 py-1 text-[var(--text-dim)] hover:border-[var(--color-dorado)] hover:text-[var(--color-dorado)]"
+        >
+          Usar plantilla de reflexión diaria
+        </button>
+      )}
       <textarea
         value={body}
         onChange={(e) => setBody(e.target.value)}
@@ -413,6 +422,14 @@ function NoteEditor({
         rows={10}
         className="w-full bg-transparent outline-none resize-none leading-relaxed text-[var(--text-dim)]"
       />
+
+      {note.type === "decision" && (
+        <DecisionFields meta={note.decisionMeta} onChange={(m) => onChange({ decisionMeta: m })} />
+      )}
+
+      {note.type === "aprendizaje" && (
+        <ApplicationField value={note.application} onChange={(v) => onChange({ application: v })} />
+      )}
 
       {/* Conversión instantánea */}
       <div className="flex flex-wrap items-center gap-2 mt-4 pt-4 border-t border-[var(--border)]">
@@ -487,6 +504,93 @@ function NoteEditor({
 
       {/* Fuentes */}
       <SourcesSection note={note} onChange={onChange} />
+    </div>
+  );
+}
+
+function DecisionFields({
+  meta,
+  onChange,
+}: {
+  meta?: DecisionMeta;
+  onChange: (m: DecisionMeta) => void;
+}) {
+  const [local, setLocal] = useState<DecisionMeta>(meta ?? {});
+  const lastSaved = useRef(meta ?? {});
+  const onChangeRef = useRef(onChange);
+  onChangeRef.current = onChange;
+
+  useEffect(() => {
+    if (local === lastSaved.current) return;
+    const t = setTimeout(() => {
+      lastSaved.current = local;
+      onChangeRef.current(local);
+    }, 600);
+    return () => clearTimeout(t);
+  }, [local]);
+
+  const set = (patch: Partial<DecisionMeta>) =>
+    setLocal((l) => ({ ...l, ...patch }));
+
+  return (
+    <div className="mt-4 pt-4 border-t border-[var(--border)] space-y-3">
+      <div className="uppercase-label text-[var(--text-faint)]">Bitácora de la decisión</div>
+      <div>
+        <label className="uppercase-label text-[var(--text-faint)] block mb-1">Motivo</label>
+        <textarea
+          value={local.motivo ?? ""}
+          onChange={(e) => set({ motivo: e.target.value })}
+          placeholder="¿Por qué se tomó esta decisión?"
+          rows={2}
+          className="w-full rounded-lg border border-[var(--border)] bg-[var(--surface-2)] px-3 py-2 text-sm outline-none resize-none"
+        />
+      </div>
+      <div>
+        <label className="uppercase-label text-[var(--text-faint)] block mb-1">Resultado esperado</label>
+        <textarea
+          value={local.resultadoEsperado ?? ""}
+          onChange={(e) => set({ resultadoEsperado: e.target.value })}
+          placeholder="¿Qué se espera que pase?"
+          rows={2}
+          className="w-full rounded-lg border border-[var(--border)] bg-[var(--surface-2)] px-3 py-2 text-sm outline-none resize-none"
+        />
+      </div>
+      <div>
+        <label className="uppercase-label text-[var(--text-faint)] block mb-1">Resultado real</label>
+        <textarea
+          value={local.resultadoReal ?? ""}
+          onChange={(e) => set({ resultadoReal: e.target.value })}
+          placeholder="¿Qué pasó realmente? (completar después)"
+          rows={2}
+          className="w-full rounded-lg border border-[var(--border)] bg-[var(--surface-2)] px-3 py-2 text-sm outline-none resize-none"
+        />
+      </div>
+    </div>
+  );
+}
+
+function ApplicationField({
+  value,
+  onChange,
+}: {
+  value?: string;
+  onChange: (v: string) => void;
+}) {
+  const [application, setApplication] = useState(value ?? "");
+  useDebouncedSave(application, value ?? "", onChange);
+
+  return (
+    <div className="mt-4 pt-4 border-t border-[var(--border)]">
+      <label className="uppercase-label text-[var(--text-faint)] block mb-1">
+        Aplicación práctica
+      </label>
+      <textarea
+        value={application}
+        onChange={(e) => setApplication(e.target.value)}
+        placeholder="¿Cómo vas a usar esto en la firma o en tu día a día?"
+        rows={2}
+        className="w-full rounded-lg border border-[var(--border)] bg-[var(--surface-2)] px-3 py-2 text-sm outline-none resize-none"
+      />
     </div>
   );
 }

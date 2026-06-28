@@ -14,6 +14,14 @@ export type Visibility = UserId[];
 
 export type Priority = "alta" | "media" | "baja";
 
+export type TaskRecurrence = "diaria" | "semanal";
+
+export interface Subtask {
+  id: string;
+  text: string;
+  done: boolean;
+}
+
 export interface Task {
   id: string;
   title: string;
@@ -27,6 +35,12 @@ export interface Task {
   folio?: string;
   createdAt: string;
   completedAt?: string;
+  subtasks?: Subtask[];
+  recurrence?: TaskRecurrence;
+  postponeCount?: number;
+  linkedHabitId?: string;
+  convertedToHabitId?: string;
+  deletedAt?: string;
 }
 
 export type EventKind = "reunion" | "evento";
@@ -53,6 +67,7 @@ export interface CalEvent {
   visibleTo: Visibility;
   notes?: string;
   meetingId?: string;
+  deletedAt?: string;
 }
 
 export type AgreementKind = "acuerdo" | "decision";
@@ -64,7 +79,7 @@ export interface Agreement {
   legalBasis?: string;
 }
 
-export type MeetingType = "ordinaria" | "extraordinaria" | "informal";
+export type MeetingType = "ordinaria" | "extraordinaria" | "informal" | "rutina_estudio";
 
 export interface Meeting {
   id: string;
@@ -78,6 +93,7 @@ export interface Meeting {
   minute: string;
   agreements: Agreement[];
   closed: boolean;
+  deletedAt?: string;
 }
 
 export type NoteType =
@@ -120,6 +136,12 @@ export interface Source {
   note?: string;
 }
 
+export interface DecisionMeta {
+  motivo?: string;
+  resultadoEsperado?: string;
+  resultadoReal?: string;
+}
+
 export interface Note {
   id: string;
   title: string;
@@ -134,7 +156,23 @@ export interface Note {
   goalId?: string;
   createdAt: string;
   updatedAt: string;
+  deletedAt?: string;
+  decisionMeta?: DecisionMeta;
+  application?: string;
 }
+
+export const REFLEXION_TEMPLATE = `1. ¿Qué logré hoy?
+
+
+2. ¿Qué se interpuso o no funcionó?
+
+
+3. ¿Qué aprendí?
+
+
+4. ¿Qué voy a hacer diferente mañana?
+
+`;
 
 export type MessageKind = "text" | "task" | "event" | "note";
 
@@ -168,6 +206,7 @@ export interface Habit {
   priority?: Priority;
   recommendedTime?: string; // HH:mm
   estimatedMinutes?: number;
+  deletedAt?: string;
 }
 
 export type GoalScope = "firma" | "personal";
@@ -188,7 +227,11 @@ export interface Goal {
   linkedTaskIds: string[];
   linkedHabitIds: string[];
   createdAt: string;
+  deletedAt?: string;
 }
+
+/** Tipos de entidad soportados por la papelera. */
+export type TrashKind = "task" | "event" | "meeting" | "note" | "habit" | "goal";
 
 export type NotifKind =
   | "tarea-asignada"

@@ -52,8 +52,11 @@ create table if not exists public.events (
   visible_to uuid[] not null default '{}',
   notes text,
   meeting_id uuid,
-  created_at timestamptz not null default now()
+  created_at timestamptz not null default now(),
+  deleted_at timestamptz
 );
+
+alter table public.events add column if not exists deleted_at timestamptz;
 
 alter table public.events enable row level security;
 
@@ -86,8 +89,22 @@ create table if not exists public.tasks (
   meeting_id uuid,
   folio text,
   completed_at date,
-  created_at timestamptz not null default now()
+  created_at timestamptz not null default now(),
+  subtasks jsonb not null default '[]',
+  recurrence text check (recurrence in ('diaria','semanal')),
+  postpone_count int not null default 0,
+  linked_habit_id uuid,
+  converted_to_habit_id uuid,
+  deleted_at timestamptz
 );
+
+-- Migración: agrega columnas nuevas si la tabla ya existía sin ellas
+alter table public.tasks add column if not exists subtasks jsonb not null default '[]';
+alter table public.tasks add column if not exists recurrence text check (recurrence in ('diaria','semanal'));
+alter table public.tasks add column if not exists postpone_count int not null default 0;
+alter table public.tasks add column if not exists linked_habit_id uuid;
+alter table public.tasks add column if not exists converted_to_habit_id uuid;
+alter table public.tasks add column if not exists deleted_at timestamptz;
 
 alter table public.tasks enable row level security;
 
@@ -112,7 +129,7 @@ create policy "tasks delete own" on public.tasks
 create table if not exists public.meetings (
   id uuid primary key default gen_random_uuid(),
   title text not null,
-  type text not null default 'ordinaria' check (type in ('ordinaria','extraordinaria','informal')),
+  type text not null default 'ordinaria' check (type in ('ordinaria','extraordinaria','informal','rutina_estudio')),
   date date not null,
   start_time text not null,
   attendees uuid[] not null default '{}',
@@ -120,8 +137,13 @@ create table if not exists public.meetings (
   minute text not null default '',
   agreements jsonb not null default '[]'::jsonb,
   closed boolean not null default false,
-  created_at timestamptz not null default now()
+  created_at timestamptz not null default now(),
+  deleted_at timestamptz
 );
+
+alter table public.meetings add column if not exists deleted_at timestamptz;
+alter table public.meetings drop constraint if exists meetings_type_check;
+alter table public.meetings add constraint meetings_type_check check (type in ('ordinaria','extraordinaria','informal','rutina_estudio'));
 
 alter table public.meetings enable row level security;
 
@@ -167,6 +189,9 @@ alter table public.notes add column if not exists pinned boolean not null defaul
 alter table public.notes add column if not exists converted_to_kind text check (converted_to_kind in ('task','habit','goal','event'));
 alter table public.notes add column if not exists converted_to_id uuid;
 alter table public.notes add column if not exists goal_id uuid;
+alter table public.notes add column if not exists deleted_at timestamptz;
+alter table public.notes add column if not exists decision_meta jsonb;
+alter table public.notes add column if not exists application text;
 
 alter table public.notes enable row level security;
 
@@ -209,6 +234,7 @@ alter table public.habits add column if not exists category text check (category
 alter table public.habits add column if not exists priority text check (priority in ('alta','media','baja'));
 alter table public.habits add column if not exists recommended_time text;
 alter table public.habits add column if not exists estimated_minutes int;
+alter table public.habits add column if not exists deleted_at timestamptz;
 
 alter table public.habits enable row level security;
 
@@ -232,8 +258,11 @@ create table if not exists public.goals (
   status text not null default 'activa' check (status in ('activa','lograda','pausada')),
   linked_task_ids uuid[] not null default '{}',
   linked_habit_ids uuid[] not null default '{}',
-  created_at timestamptz not null default now()
+  created_at timestamptz not null default now(),
+  deleted_at timestamptz
 );
+
+alter table public.goals add column if not exists deleted_at timestamptz;
 
 alter table public.goals enable row level security;
 

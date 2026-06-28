@@ -48,9 +48,9 @@ export function Habitos() {
   const today = todayISO();
   const days = last7Days();
 
-  const habits = data.habits.filter((h) => h.owner === currentUser && !h.archived);
-  const tasks = data.tasks.filter((t) => t.owner === currentUser);
-  const goals = data.goals.filter((g) => g.owner === currentUser && g.status === "activa");
+  const habits = data.habits.filter((h) => h.owner === currentUser && !h.archived && !h.deletedAt);
+  const tasks = data.tasks.filter((t) => t.owner === currentUser && !t.deletedAt);
+  const goals = data.goals.filter((g) => g.owner === currentUser && g.status === "activa" && !g.deletedAt);
 
   const doneToday = habits.filter((h) => h.completions.includes(today)).length;
   const percent = habits.length ? Math.round((doneToday / habits.length) * 100) : 0;

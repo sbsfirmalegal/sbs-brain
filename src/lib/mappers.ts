@@ -31,6 +31,12 @@ export function rowToTask(r: any, m: ProfileMap): Task {
     folio: r.folio ?? undefined,
     createdAt: r.created_at,
     completedAt: r.completed_at ?? undefined,
+    subtasks: r.subtasks ?? [],
+    recurrence: r.recurrence ?? undefined,
+    postponeCount: r.postpone_count ?? 0,
+    linkedHabitId: r.linked_habit_id ?? undefined,
+    convertedToHabitId: r.converted_to_habit_id ?? undefined,
+    deletedAt: r.deleted_at ?? undefined,
   };
 }
 export function taskToRow(t: Partial<Task>, m: ProfileMap) {
@@ -46,6 +52,13 @@ export function taskToRow(t: Partial<Task>, m: ProfileMap) {
   if (t.meetingId !== undefined) row.meeting_id = t.meetingId ?? null;
   if (t.folio !== undefined) row.folio = t.folio ?? null;
   if (t.completedAt !== undefined) row.completed_at = t.completedAt ?? null;
+  if (t.subtasks !== undefined) row.subtasks = t.subtasks;
+  if (t.recurrence !== undefined) row.recurrence = t.recurrence ?? null;
+  if (t.postponeCount !== undefined) row.postpone_count = t.postponeCount;
+  if (t.linkedHabitId !== undefined) row.linked_habit_id = t.linkedHabitId ?? null;
+  if (t.convertedToHabitId !== undefined)
+    row.converted_to_habit_id = t.convertedToHabitId ?? null;
+  if (t.deletedAt !== undefined) row.deleted_at = t.deletedAt ?? null;
   return row;
 }
 
@@ -65,6 +78,7 @@ export function rowToEvent(r: any, m: ProfileMap): CalEvent {
     visibleTo: uuidsToSlugs(r.visible_to, m),
     notes: r.notes ?? undefined,
     meetingId: r.meeting_id ?? undefined,
+    deletedAt: r.deleted_at ?? undefined,
   };
 }
 export function eventToRow(e: Partial<CalEvent>, m: ProfileMap) {
@@ -82,6 +96,7 @@ export function eventToRow(e: Partial<CalEvent>, m: ProfileMap) {
   if (e.visibleTo !== undefined) row.visible_to = slugsToUuids(e.visibleTo, m);
   if (e.notes !== undefined) row.notes = e.notes ?? null;
   if (e.meetingId !== undefined) row.meeting_id = e.meetingId ?? null;
+  if (e.deletedAt !== undefined) row.deleted_at = e.deletedAt ?? null;
   return row;
 }
 
@@ -99,6 +114,7 @@ export function rowToMeeting(r: any, m: ProfileMap): Meeting {
     minute: r.minute ?? "",
     agreements: (r.agreements ?? []) as Agreement[],
     closed: r.closed ?? false,
+    deletedAt: r.deleted_at ?? undefined,
   };
 }
 export function meetingToRow(mt: Partial<Meeting>, m: ProfileMap) {
@@ -114,6 +130,7 @@ export function meetingToRow(mt: Partial<Meeting>, m: ProfileMap) {
   if (mt.minute !== undefined) row.minute = mt.minute;
   if (mt.agreements !== undefined) row.agreements = mt.agreements;
   if (mt.closed !== undefined) row.closed = mt.closed;
+  if (mt.deletedAt !== undefined) row.deleted_at = mt.deletedAt ?? null;
   return row;
 }
 
@@ -136,6 +153,9 @@ export function rowToNote(r: any, m: ProfileMap): Note {
     goalId: r.goal_id ?? undefined,
     createdAt: r.created_at,
     updatedAt: r.updated_at,
+    deletedAt: r.deleted_at ?? undefined,
+    decisionMeta: r.decision_meta ?? undefined,
+    application: r.application ?? undefined,
   };
 }
 export function noteToRow(n: Partial<Note>, m: ProfileMap) {
@@ -154,6 +174,9 @@ export function noteToRow(n: Partial<Note>, m: ProfileMap) {
     row.converted_to_id = n.convertedTo?.id ?? null;
   }
   if (n.goalId !== undefined) row.goal_id = n.goalId ?? null;
+  if (n.deletedAt !== undefined) row.deleted_at = n.deletedAt ?? null;
+  if (n.decisionMeta !== undefined) row.decision_meta = n.decisionMeta ?? null;
+  if (n.application !== undefined) row.application = n.application ?? null;
   return row;
 }
 
@@ -175,6 +198,7 @@ export function rowToHabit(r: any, m: ProfileMap): Habit {
     priority: r.priority ?? undefined,
     recommendedTime: r.recommended_time ?? undefined,
     estimatedMinutes: r.estimated_minutes ?? undefined,
+    deletedAt: r.deleted_at ?? undefined,
   };
 }
 export function habitToRow(h: Partial<Habit>, m: ProfileMap) {
@@ -192,6 +216,7 @@ export function habitToRow(h: Partial<Habit>, m: ProfileMap) {
   if (h.priority !== undefined) row.priority = h.priority ?? null;
   if (h.recommendedTime !== undefined) row.recommended_time = h.recommendedTime ?? null;
   if (h.estimatedMinutes !== undefined) row.estimated_minutes = h.estimatedMinutes ?? null;
+  if (h.deletedAt !== undefined) row.deleted_at = h.deletedAt ?? null;
   return row;
 }
 
@@ -212,6 +237,7 @@ export function rowToGoal(r: any, m: ProfileMap): Goal {
     linkedTaskIds: r.linked_task_ids ?? [],
     linkedHabitIds: r.linked_habit_ids ?? [],
     createdAt: r.created_at,
+    deletedAt: r.deleted_at ?? undefined,
   };
 }
 export function goalToRow(g: Partial<Goal>, m: ProfileMap) {
@@ -229,6 +255,7 @@ export function goalToRow(g: Partial<Goal>, m: ProfileMap) {
   if (g.status !== undefined) row.status = g.status;
   if (g.linkedTaskIds !== undefined) row.linked_task_ids = g.linkedTaskIds;
   if (g.linkedHabitIds !== undefined) row.linked_habit_ids = g.linkedHabitIds;
+  if (g.deletedAt !== undefined) row.deleted_at = g.deletedAt ?? null;
   return row;
 }
 
