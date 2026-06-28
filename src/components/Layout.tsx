@@ -30,11 +30,11 @@ import { useState } from "react";
 const NAV = [
   { to: "/hoy", label: "Hoy", icon: Home, n: "01" },
   { to: "/agenda", label: "Agenda", icon: Calendar, n: "02" },
-  { to: "/reuniones", label: "Reuniones", icon: Users, n: "03" },
+  { to: "/notas", label: "Notas", icon: StickyNote, n: "03" },
   { to: "/tareas", label: "Tareas", icon: CheckSquare, n: "04" },
   { to: "/habitos", label: "Hábitos", icon: Flame, n: "05" },
   { to: "/metas", label: "Metas", icon: Target, n: "06" },
-  { to: "/notas", label: "Notas", icon: StickyNote, n: "07" },
+  { to: "/reuniones", label: "Reuniones", icon: Users, n: "07" },
   { to: "/chat", label: "Chat", icon: MessageCircle, n: "08" },
 ];
 
