@@ -1,10 +1,19 @@
 /// <reference lib="webworker" />
-import { precacheAndRoute } from "workbox-precaching";
+import { precacheAndRoute, createHandlerBoundToURL } from "workbox-precaching";
+import { NavigationRoute, registerRoute } from "workbox-routing";
 
 declare let self: ServiceWorkerGlobalScope;
 
 // Precache de los assets generados por el build (PWA / offline)
 precacheAndRoute(self.__WB_MANIFEST);
+
+// SPA fallback: cualquier navegación (ej. /agenda, /reuniones) responde con index.html cacheado.
+// Esto evita el 404 de Vercel cuando se reabre la PWA después de un rato.
+const navigationHandler = createHandlerBoundToURL("/index.html");
+const navigationRoute = new NavigationRoute(navigationHandler, {
+  denylist: [/^\/api\//, /^\/assets\//],
+});
+registerRoute(navigationRoute);
 
 // Activar el SW nuevo de inmediato
 self.addEventListener("install", () => {
