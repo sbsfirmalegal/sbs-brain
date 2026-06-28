@@ -72,7 +72,7 @@ interface Ctx {
   toggleTheme: () => void;
   toggleSidebar: () => void;
   // tasks
-  addTask: (t: Partial<Task> & { title: string; owner: UserId }) => Promise<void>;
+  addTask: (t: Partial<Task> & { title: string; owner: UserId }) => Promise<Task | null>;
   toggleTask: (id: string) => Promise<void>;
   updateTask: (id: string, patch: Partial<Task>) => Promise<void>;
   deleteTask: (id: string) => Promise<void>;
@@ -85,7 +85,7 @@ interface Ctx {
   updateMeeting: (id: string, patch: Partial<Meeting>) => Promise<void>;
   deleteMeeting: (id: string) => Promise<void>;
   // notes
-  addNote: (n: Partial<Note> & { title: string; owner: UserId }) => Promise<void>;
+  addNote: (n: Partial<Note> & { title: string; owner: UserId }) => Promise<Note | null>;
   updateNote: (id: string, patch: Partial<Note>) => Promise<void>;
   deleteNote: (id: string) => Promise<void>;
   // chat
@@ -97,12 +97,12 @@ interface Ctx {
   markAllNotifsRead: () => Promise<void>;
   clearNotifs: () => Promise<void>;
   // hábitos
-  addHabit: (h: Partial<Habit> & { name: string; owner: UserId }) => Promise<void>;
+  addHabit: (h: Partial<Habit> & { name: string; owner: UserId }) => Promise<Habit | null>;
   toggleHabitToday: (id: string, isoDay?: string) => Promise<void>;
   updateHabit: (id: string, patch: Partial<Habit>) => Promise<void>;
   deleteHabit: (id: string) => Promise<void>;
   // metas
-  addGoal: (g: Partial<Goal> & { title: string; owner: UserId }) => Promise<void>;
+  addGoal: (g: Partial<Goal> & { title: string; owner: UserId }) => Promise<Goal | null>;
   updateGoal: (id: string, patch: Partial<Goal>) => Promise<void>;
   deleteGoal: (id: string) => Promise<void>;
   // visibility helper
@@ -362,6 +362,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
             read: false,
           });
         }
+        return ins ? rowToTask(ins, m) : null;
       },
       toggleTask: async (id) => {
         const t = data.tasks.find((x) => x.id === id);
@@ -455,7 +456,12 @@ export function StoreProvider({ children }: { children: ReactNode }) {
           },
           m
         );
-        await supabase.from("notes").insert(row);
+        const { data: ins } = await supabase
+          .from("notes")
+          .insert(row)
+          .select()
+          .single();
+        return ins ? rowToNote(ins, m) : null;
       },
       updateNote: async (id, patch) => {
         const m = requireMap();
@@ -537,7 +543,12 @@ export function StoreProvider({ children }: { children: ReactNode }) {
           },
           m
         );
-        await supabase.from("habits").insert(row);
+        const { data: ins } = await supabase
+          .from("habits")
+          .insert(row)
+          .select()
+          .single();
+        return ins ? rowToHabit(ins, m) : null;
       },
       toggleHabitToday: async (id, isoDay) => {
         const h = data.habits.find((x) => x.id === id);
@@ -571,7 +582,12 @@ export function StoreProvider({ children }: { children: ReactNode }) {
           },
           m
         );
-        await supabase.from("goals").insert(row);
+        const { data: ins } = await supabase
+          .from("goals")
+          .insert(row)
+          .select()
+          .single();
+        return ins ? rowToGoal(ins, m) : null;
       },
       updateGoal: async (id, patch) => {
         const m = requireMap();

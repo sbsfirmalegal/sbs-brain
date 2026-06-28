@@ -80,7 +80,24 @@ export interface Meeting {
   closed: boolean;
 }
 
-export type NoteType = "idea" | "reflexion" | "minuta" | "aprendizaje";
+export type NoteType =
+  | "idea"
+  | "reflexion"
+  | "minuta"
+  | "aprendizaje"
+  | "decision"
+  | "lectura"
+  | "proyecto_personal"
+  | "reunion_interna"
+  | "diario"
+  | "ia_tecnologia";
+
+export type ConvertibleKind = "task" | "habit" | "goal" | "event";
+
+export interface ConvertedTo {
+  kind: ConvertibleKind;
+  id: string;
+}
 
 export type SourceKind =
   | "youtube"
@@ -112,6 +129,9 @@ export interface Note {
   tags: string[];
   type: NoteType;
   sources?: Source[];
+  pinned?: boolean;
+  convertedTo?: ConvertedTo;
+  goalId?: string;
   createdAt: string;
   updatedAt: string;
 }

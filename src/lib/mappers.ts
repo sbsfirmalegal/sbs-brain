@@ -128,6 +128,12 @@ export function rowToNote(r: any, m: ProfileMap): Note {
     tags: r.tags ?? [],
     type: r.type,
     sources: (r.sources ?? []) as Source[],
+    pinned: r.pinned ?? false,
+    convertedTo:
+      r.converted_to_kind && r.converted_to_id
+        ? { kind: r.converted_to_kind, id: r.converted_to_id }
+        : undefined,
+    goalId: r.goal_id ?? undefined,
     createdAt: r.created_at,
     updatedAt: r.updated_at,
   };
@@ -142,6 +148,12 @@ export function noteToRow(n: Partial<Note>, m: ProfileMap) {
   if (n.tags !== undefined) row.tags = n.tags;
   if (n.type !== undefined) row.type = n.type;
   if (n.sources !== undefined) row.sources = n.sources;
+  if (n.pinned !== undefined) row.pinned = n.pinned;
+  if (n.convertedTo !== undefined) {
+    row.converted_to_kind = n.convertedTo?.kind ?? null;
+    row.converted_to_id = n.convertedTo?.id ?? null;
+  }
+  if (n.goalId !== undefined) row.goal_id = n.goalId ?? null;
   return row;
 }
 

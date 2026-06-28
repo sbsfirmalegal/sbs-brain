@@ -150,11 +150,23 @@ create table if not exists public.notes (
   owner uuid not null references public.profiles(id) on delete cascade,
   visible_to uuid[] not null default '{}',
   tags text[] not null default '{}',
-  type text not null default 'idea' check (type in ('idea','reflexion','minuta','aprendizaje')),
+  type text not null default 'idea' check (type in ('idea','reflexion','minuta','aprendizaje','decision','lectura','proyecto_personal','reunion_interna','diario','ia_tecnologia')),
   sources jsonb not null default '[]'::jsonb,
+  pinned boolean not null default false,
+  converted_to_kind text check (converted_to_kind in ('task','habit','goal','event')),
+  converted_to_id uuid,
+  goal_id uuid,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
+
+-- Migración: ampliar tipos de nota y agregar columnas nuevas si la tabla ya existía
+alter table public.notes drop constraint if exists notes_type_check;
+alter table public.notes add constraint notes_type_check check (type in ('idea','reflexion','minuta','aprendizaje','decision','lectura','proyecto_personal','reunion_interna','diario','ia_tecnologia'));
+alter table public.notes add column if not exists pinned boolean not null default false;
+alter table public.notes add column if not exists converted_to_kind text check (converted_to_kind in ('task','habit','goal','event'));
+alter table public.notes add column if not exists converted_to_id uuid;
+alter table public.notes add column if not exists goal_id uuid;
 
 alter table public.notes enable row level security;
 

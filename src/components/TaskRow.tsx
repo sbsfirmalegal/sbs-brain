@@ -2,7 +2,7 @@ import type { Task } from "../data/types";
 import { useStore } from "../store/store";
 import { Avatar, PriorityBadge, SemaphoreDot, VisibilityBadge } from "./ui";
 import { dueBucket, dueLabel } from "../lib/dates";
-import { Link2 } from "lucide-react";
+import { Link2, Trash2 } from "lucide-react";
 
 const toneFor = (t: Task) => {
   const b = dueBucket(t.due);
@@ -12,7 +12,7 @@ const toneFor = (t: Task) => {
 };
 
 export function TaskRow({ task }: { task: Task }) {
-  const { toggleTask, data } = useStore();
+  const { toggleTask, deleteTask, data } = useStore();
   const meeting = task.meetingId
     ? data.meetings.find((m) => m.id === task.meetingId)
     : null;
@@ -59,6 +59,12 @@ export function TaskRow({ task }: { task: Task }) {
         </span>
         <PriorityBadge p={task.priority} />
         <Avatar id={task.owner} size={26} />
+        <button
+          onClick={() => deleteTask(task.id)}
+          className="text-[var(--text-faint)] hover:text-[var(--color-rojo)] opacity-0 group-hover:opacity-100 transition-opacity"
+        >
+          <Trash2 size={15} />
+        </button>
       </div>
     </div>
   );
