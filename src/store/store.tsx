@@ -16,7 +16,6 @@ import type {
   Meeting,
   Note,
   Notification,
-  NotifKind,
   Task,
   TrashKind,
   UserId,
@@ -292,69 +291,6 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     const i = setInterval(purgeExpired, 60 * 60 * 1000);
     return () => clearInterval(i);
   }, [currentUser, data.tasks, data.events, data.meetings, data.notes, data.habits, data.goals]);
-
-  /* ─────────── Notificaciones derivadas (locales por usuario) ─────────── */
-  useEffect(() => {
-    if (!currentUser || !profileMapRef.current) return;
-    const map = profileMapRef.current;
-    const me = currentUser;
-    const meUuid = map.uuidOf[me];
-
-    const generate = async () => {
-      const todayKey = todayISO();
-
-      // Consultar directo a Supabase para evitar duplicados por race condition
-      const { data: existingRows } = await supabase
-        .from("notifications")
-        .select("kind, ref_id, created_at")
-        .eq("recipient", meUuid)
-        .gte("created_at", `${todayKey}T00:00:00`);
-
-      const existing = new Set(
-        (existingRows ?? []).map(
-          (n: any) => `${n.kind}:${n.ref_id ?? ""}`
-        )
-      );
-
-      const inserts: any[] = [];
-      const push = (kind: NotifKind, title: string, opts: Partial<Notification>) => {
-        const key = `${kind}:${opts.refId ?? ""}`;
-        if (existing.has(key)) return;
-        inserts.push({
-          kind,
-          recipient: meUuid,
-          title,
-          body: opts.body ?? null,
-          link: opts.link ?? null,
-          ref_id: opts.refId ?? null,
-          read: false,
-        });
-        existing.add(key);
-      };
-      data.tasks.forEach((t) => {
-        if (t.done || !t.visibleTo.includes(me)) return;
-        if (t.due === todayKey)
-          push("tarea-vence-hoy", `Vence hoy: ${t.title}`, { refId: t.id, link: "/tareas" });
-        else if (t.due && t.due < todayKey)
-          push("tarea-atrasada", `Atrasada: ${t.title}`, { refId: t.id, link: "/tareas" });
-      });
-      data.events.forEach((e) => {
-        if (e.kind !== "reunion") return;
-        if (e.date !== todayKey || !e.visibleTo.includes(me)) return;
-        push("reunion-proxima", `Reunión hoy: ${e.title}`, {
-          refId: e.id,
-          link: "/reuniones",
-          body: `${e.start}${e.location ? ` · ${e.location}` : ""}`,
-        });
-      });
-      if (inserts.length) {
-        await supabase.from("notifications").insert(inserts);
-      }
-    };
-    generate();
-    const i = setInterval(generate, 5 * 60 * 1000);
-    return () => clearInterval(i);
-  }, [currentUser, data.tasks, data.events]);
 
   /* ─────────── Mutaciones ─────────── */
   const value = useMemo<Ctx>(() => {

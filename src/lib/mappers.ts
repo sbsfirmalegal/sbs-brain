@@ -78,6 +78,7 @@ export function rowToEvent(r: any, m: ProfileMap): CalEvent {
     visibleTo: uuidsToSlugs(r.visible_to, m),
     notes: r.notes ?? undefined,
     meetingId: r.meeting_id ?? undefined,
+    reminderMinutes: r.reminder_minutes ?? undefined,
     deletedAt: r.deleted_at ?? undefined,
   };
 }
@@ -96,6 +97,7 @@ export function eventToRow(e: Partial<CalEvent>, m: ProfileMap) {
   if (e.visibleTo !== undefined) row.visible_to = slugsToUuids(e.visibleTo, m);
   if (e.notes !== undefined) row.notes = e.notes ?? null;
   if (e.meetingId !== undefined) row.meeting_id = e.meetingId ?? null;
+  if (e.reminderMinutes !== undefined) row.reminder_minutes = e.reminderMinutes ?? null;
   if (e.deletedAt !== undefined) row.deleted_at = e.deletedAt ?? null;
   return row;
 }

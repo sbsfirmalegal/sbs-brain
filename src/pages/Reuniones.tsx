@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   ChevronRight,
@@ -172,6 +172,9 @@ function MeetingDetail({
     setNewTask("");
   }
 
+  const [minute, setMinute] = useState(meeting.minute);
+  useDebouncedSave(minute, meeting.minute, (v) => updateMeeting(meeting.id, { minute: v }));
+
   const canClose = meeting.minute.trim().length > 0 &&
     (meeting.agreements.length > 0 || linkedTasks.length > 0);
 
@@ -190,7 +193,8 @@ function MeetingDetail({
         exit={{ x: 60, opacity: 0 }}
         transition={{ type: "spring", damping: 30, stiffness: 300 }}
         onClick={(e) => e.stopPropagation()}
-        className="w-full max-w-xl h-full overflow-y-auto bg-[var(--bg)] border-l border-[var(--border-strong)] p-6"
+        className="w-full max-w-xl overflow-y-auto bg-[var(--bg)] border-l border-[var(--border-strong)] p-6"
+        style={{ height: "100dvh" }}
       >
         <div className="flex items-start justify-between mb-2">
           <div className="flex items-center gap-2">
@@ -217,8 +221,8 @@ function MeetingDetail({
         {/* Minuta */}
         <Section icon={<Scale size={15} />} title="Minuta">
           <textarea
-            value={meeting.minute}
-            onChange={(e) => updateMeeting(meeting.id, { minute: e.target.value })}
+            value={minute}
+            onChange={(e) => setMinute(e.target.value)}
             placeholder="Resumen de lo conversado…"
             rows={4}
             className="w-full rounded-xl border border-[var(--border)] bg-[var(--surface)] p-3 text-sm outline-none focus:border-[var(--border-strong)] resize-none"
@@ -533,4 +537,28 @@ function Section({
       {children}
     </section>
   );
+}
+
+/** Guarda `value` contra el store 600ms después de que el usuario deja de escribir,
+ *  para no perder caracteres por la latencia de red en un campo controlado remotamente. */
+function useDebouncedSave(value: string, initial: string, save: (v: string) => void) {
+  const saveRef = useRef(save);
+  saveRef.current = save;
+  const lastSaved = useRef(initial);
+
+  useEffect(() => {
+    if (value === lastSaved.current) return;
+    const t = setTimeout(() => {
+      lastSaved.current = value;
+      saveRef.current(value);
+    }, 600);
+    return () => clearTimeout(t);
+  }, [value]);
+
+  useEffect(() => {
+    return () => {
+      if (value !== lastSaved.current) saveRef.current(value);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 }

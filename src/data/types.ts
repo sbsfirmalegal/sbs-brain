@@ -67,6 +67,8 @@ export interface CalEvent {
   visibleTo: Visibility;
   notes?: string;
   meetingId?: string;
+  /** Minutos de anticipación para el recordatorio (ej. 30 = avisar 30 min antes de `start`). null/undefined = avisar el mismo día sin esperar la hora. */
+  reminderMinutes?: number;
   deletedAt?: string;
 }
 
@@ -238,6 +240,8 @@ export type NotifKind =
   | "tarea-vence-hoy"
   | "tarea-atrasada"
   | "reunion-proxima"
+  | "evento-proximo"
+  | "habito-pendiente"
   | "mensaje"
   | "meta-lograda"
   | "sistema";

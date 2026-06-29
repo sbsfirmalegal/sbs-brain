@@ -52,11 +52,13 @@ create table if not exists public.events (
   visible_to uuid[] not null default '{}',
   notes text,
   meeting_id uuid,
+  reminder_minutes int,
   created_at timestamptz not null default now(),
   deleted_at timestamptz
 );
 
 alter table public.events add column if not exists deleted_at timestamptz;
+alter table public.events add column if not exists reminder_minutes int;
 
 alter table public.events enable row level security;
 
@@ -408,6 +410,101 @@ drop trigger if exists on_auth_user_created on auth.users;
 create trigger on_auth_user_created
   after insert on auth.users
   for each row execute function public.handle_new_user();
+
+-- ───────── RECORDATORIOS AUTOMÁTICOS (server-side, funciona con la app cerrada) ─────────
+-- Genera filas en `notifications` para tareas por vencer/atrasadas, eventos/reuniones
+-- (respetando reminder_minutes de anticipación) y hábitos pendientes (recommended_time).
+-- El INSERT en notifications dispara el Database Webhook → Edge Function send-push.
+create or replace function public.generate_reminders()
+returns void
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  now_sv timestamp := (now() at time zone 'America/El_Salvador');
+  today_sv date := now_sv::date;
+  r record;
+begin
+  -- TAREAS: vencen hoy o atrasadas (una vez por día por destinatario)
+  for r in
+    select t.id, t.title, t.due, unnest(t.visible_to) as recipient
+    from public.tasks t
+    where t.done = false and t.deleted_at is null and t.due is not null and t.due <= today_sv
+  loop
+    insert into public.notifications (kind, recipient, title, body, link, ref_id, read)
+    select
+      case when r.due = today_sv then 'tarea-vence-hoy' else 'tarea-atrasada' end,
+      r.recipient,
+      case when r.due = today_sv then 'Vence hoy: ' || r.title else 'Atrasada: ' || r.title end,
+      null, '/tareas', r.id, false
+    where not exists (
+      select 1 from public.notifications n
+      where n.recipient = r.recipient and n.ref_id = r.id
+        and n.kind = case when r.due = today_sv then 'tarea-vence-hoy' else 'tarea-atrasada' end
+        and n.created_at >= today_sv::timestamp
+    );
+  end loop;
+
+  -- EVENTOS Y REUNIONES: hoy, respetando anticipación (reminder_minutes). Sin reminder_minutes,
+  -- avisa apenas llega el día (comportamiento histórico).
+  for r in
+    select e.id, e.title, e.kind, e.start_time, e.location, unnest(e.visible_to) as recipient
+    from public.events e
+    where e.deleted_at is null
+      and e.date = today_sv
+      and (
+        e.reminder_minutes is null
+        or now_sv >= (today_sv::timestamp + e.start_time::time) - (e.reminder_minutes || ' minutes')::interval
+      )
+  loop
+    insert into public.notifications (kind, recipient, title, body, link, ref_id, read)
+    select
+      case when r.kind = 'reunion' then 'reunion-proxima' else 'evento-proximo' end,
+      r.recipient,
+      case when r.kind = 'reunion' then 'Reunión hoy: ' || r.title else 'Evento hoy: ' || r.title end,
+      r.start_time || coalesce(' · ' || r.location, ''),
+      case when r.kind = 'reunion' then '/reuniones' else '/agenda' end,
+      r.id, false
+    where not exists (
+      select 1 from public.notifications n
+      where n.recipient = r.recipient and n.ref_id = r.id
+        and n.kind = case when r.kind = 'reunion' then 'reunion-proxima' else 'evento-proximo' end
+        and n.created_at >= today_sv::timestamp
+    );
+  end loop;
+
+  -- HÁBITOS: recordatorio diario a la hora recomendada si todavía no se completó hoy
+  for r in
+    select h.id, h.name, h.owner
+    from public.habits h
+    where h.archived = false and h.deleted_at is null
+      and h.recommended_time is not null
+      and not (today_sv = any(h.completions))
+      and now_sv::time >= h.recommended_time::time
+  loop
+    insert into public.notifications (kind, recipient, title, body, link, ref_id, read)
+    select 'habito-pendiente', r.owner, 'Pendiente hoy: ' || r.name, null, '/habitos', r.id, false
+    where not exists (
+      select 1 from public.notifications n
+      where n.recipient = r.owner and n.ref_id = r.id and n.kind = 'habito-pendiente'
+        and n.created_at >= today_sv::timestamp
+    );
+  end loop;
+end;
+$$;
+
+-- Habilitar pg_cron (en Supabase: Database → Extensions → pg_cron, o desde el SQL Editor si el proyecto lo permite)
+create extension if not exists pg_cron;
+
+-- Reprogramar el job de forma idempotente
+do $$
+begin
+  perform cron.unschedule(jobid) from cron.job where jobname = 'generate-reminders-5min';
+exception when others then null;
+end $$;
+
+select cron.schedule('generate-reminders-5min', '*/5 * * * *', 'select public.generate_reminders();');
 
 -- ───────── FIN ─────────
 -- Si llegaste hasta acá sin errores, el esquema está listo.

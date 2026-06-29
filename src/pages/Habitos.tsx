@@ -598,6 +598,7 @@ function NewHabitForm({
           type="time"
           value={recommendedTime}
           onChange={(e) => setRecommendedTime(e.target.value)}
+          title="Hora recomendada — también dispara el recordatorio diario si aún no lo marcás"
           className="rounded-lg border border-[var(--border)] bg-[var(--surface-2)] px-3 py-2 text-sm"
         />
         <input

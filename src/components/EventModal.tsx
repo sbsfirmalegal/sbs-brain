@@ -27,6 +27,9 @@ export function EventModal({ initialDate, initialTime, event, onClose }: Props) 
   const [end, setEnd] = useState(event?.end ?? "");
   const [allDay, setAllDay] = useState(event?.allDay ?? false);
   const [location, setLocation] = useState(event?.location ?? "");
+  const [reminderMinutes, setReminderMinutes] = useState<number | "">(
+    event?.reminderMinutes ?? ""
+  );
   const [notes, setNotes] = useState(event?.notes ?? "");
   const [vis, setVis] = useState<Visibility>(
     event?.visibleTo ?? [currentUser ?? "nelson"]
@@ -61,6 +64,7 @@ export function EventModal({ initialDate, initialTime, event, onClose }: Props) 
       allDay,
       location: location.trim() || undefined,
       notes: notes.trim() || undefined,
+      reminderMinutes: allDay || reminderMinutes === "" ? undefined : reminderMinutes,
       visibleTo: vis.length ? vis : [currentUser ?? "nelson"],
     };
     if (isEdit) {
@@ -206,6 +210,26 @@ export function EventModal({ initialDate, initialTime, event, onClose }: Props) 
             placeholder="Ubicación (opcional)"
             className="w-full rounded-lg border border-[var(--border)] bg-[var(--surface-2)] px-3 py-2 text-sm mb-3 placeholder:text-[var(--text-faint)]"
           />
+
+          {/* Recordatorio */}
+          {!allDay && (
+            <div className="mb-3">
+              <div className="uppercase-label text-[var(--text-faint)] mb-2">Recordatorio</div>
+              <select
+                value={reminderMinutes}
+                onChange={(e) =>
+                  setReminderMinutes(e.target.value === "" ? "" : parseInt(e.target.value))
+                }
+                className="w-full rounded-lg border border-[var(--border)] bg-[var(--surface-2)] px-3 py-2 text-sm"
+              >
+                <option value="">Al llegar el día (sin anticipación)</option>
+                <option value={10}>10 minutos antes</option>
+                <option value={30}>30 minutos antes</option>
+                <option value={60}>1 hora antes</option>
+                <option value={1440}>1 día antes</option>
+              </select>
+            </div>
+          )}
 
           {/* Notas */}
           <textarea

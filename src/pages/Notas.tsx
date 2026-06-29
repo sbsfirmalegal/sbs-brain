@@ -156,14 +156,16 @@ export function Notas() {
 
       {/* Calendario de conocimiento */}
       {stats && stats.total > 0 && (
-        <div className="rounded-2xl border border-[var(--border)] bg-[var(--surface)] p-4 mb-6 flex items-center justify-between flex-wrap gap-3">
-          <div className="uppercase-label text-[var(--text-faint)] capitalize">{stats.label}</div>
-          <div className="flex gap-5 text-sm">
-            <Stat label="Reflexiones" value={stats.reflexiones} />
-            <Stat label="Aprendizajes" value={stats.aprendizajes} />
-            <Stat label="Decisiones" value={stats.decisiones} />
-            <Stat label="Ideas" value={stats.ideas} />
-            <Stat label="Convertidas" value={stats.convertidas} />
+        <div className="rounded-2xl border border-[var(--border)] bg-[var(--surface)] p-4 mb-6 overflow-x-auto overflow-y-hidden">
+          <div className="flex items-center justify-between gap-3 min-w-max">
+            <div className="uppercase-label text-[var(--text-faint)] capitalize whitespace-nowrap">{stats.label}</div>
+            <div className="flex gap-5 text-sm">
+              <Stat label="Reflexiones" value={stats.reflexiones} />
+              <Stat label="Aprendizajes" value={stats.aprendizajes} />
+              <Stat label="Decisiones" value={stats.decisiones} />
+              <Stat label="Ideas" value={stats.ideas} />
+              <Stat label="Convertidas" value={stats.convertidas} />
+            </div>
           </div>
         </div>
       )}
