@@ -15,9 +15,11 @@ interface Result {
 export function CommandSearch({
   open,
   onClose,
+  onOpen,
 }: {
   open: boolean;
   onClose: () => void;
+  onOpen: () => void;
 }) {
   const { data, visible } = useStore();
   const [q, setQ] = useState("");
@@ -27,13 +29,13 @@ export function CommandSearch({
     const onKey = (e: KeyboardEvent) => {
       if ((e.metaKey || e.ctrlKey) && e.key === "k") {
         e.preventDefault();
-        open ? onClose() : null;
+        open ? onClose() : onOpen();
       }
-      if (e.key === "Escape") onClose();
+      if (e.key === "Escape" && open) onClose();
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [open, onClose]);
+  }, [open, onClose, onOpen]);
 
   useEffect(() => {
     if (!open) setQ("");

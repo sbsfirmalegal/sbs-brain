@@ -26,6 +26,8 @@ import {
 } from "lucide-react";
 import { useStore } from "../store/store";
 import { SectionTitle, VisibilityBadge, Chip } from "../components/ui";
+import { USER_LIST } from "../data/users";
+import type { UserId } from "../data/types";
 import { fmtDay } from "../lib/dates";
 import { filterNotes, monthlyStats, unprocessedIdeas, allTags } from "../lib/notes";
 import type { ConvertibleKind, DecisionMeta, Note, NoteType, Source, SourceKind } from "../data/types";
@@ -36,6 +38,7 @@ import {
   hostname,
   youtubeId,
 } from "../lib/sources";
+import { useDebouncedSave } from "../lib/useDebouncedSave";
 
 const TYPE_META: Record<NoteType, { label: string; icon: typeof Lightbulb; color: string }> = {
   idea: { label: "Idea", icon: Lightbulb, color: "#c9a84c" },
@@ -321,30 +324,6 @@ export function Notas() {
   );
 }
 
-/** Guarda `value` contra el store 600ms después de que el usuario deja de escribir,
- *  para no perder caracteres por la latencia de red en un campo controlado remotamente. */
-function useDebouncedSave(value: string, initial: string, save: (v: string) => void) {
-  const saveRef = useRef(save);
-  saveRef.current = save;
-  const lastSaved = useRef(initial);
-
-  useEffect(() => {
-    if (value === lastSaved.current) return;
-    const t = setTimeout(() => {
-      lastSaved.current = value;
-      saveRef.current(value);
-    }, 600);
-    return () => clearTimeout(t);
-  }, [value]);
-
-  useEffect(() => {
-    return () => {
-      if (value !== lastSaved.current) saveRef.current(value);
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-}
-
 function Stat({ label, value }: { label: string; value: number }) {
   return (
     <div className="text-center">
@@ -367,45 +346,89 @@ function NoteEditor({
   onDelete: () => void;
   onConvert: (kind: ConvertibleKind) => void;
 }) {
+  const { currentUser } = useStore();
+  const isOwner = note.owner === currentUser;
   const [tagInput, setTagInput] = useState("");
   const [title, setTitle] = useState(note.title);
   const [body, setBody] = useState(note.body);
 
-  useDebouncedSave(title, note.title, (v) => onChange({ title: v }));
-  useDebouncedSave(body, note.body, (v) => onChange({ body: v }));
+  useDebouncedSave(title, note.title, (v) => isOwner && onChange({ title: v }));
+  useDebouncedSave(body, note.body, (v) => isOwner && onChange({ body: v }));
 
   return (
     <div className="rounded-2xl border border-[var(--border)] bg-[var(--surface)] p-5">
       <div className="flex items-center justify-between mb-3">
-        <select
-          value={note.type}
-          onChange={(e) => onChange({ type: e.target.value as NoteType })}
-          className="uppercase-label bg-transparent text-[var(--color-dorado)] outline-none"
-        >
-          {Object.entries(TYPE_META).map(([k, v]) => (
-            <option key={k} value={k}>
-              {v.label}
-            </option>
-          ))}
-        </select>
-        <div className="flex items-center gap-3">
-          <button
-            onClick={() => onChange({ pinned: !note.pinned })}
-            title={note.pinned ? "Quitar de destacadas" : "Marcar como destacada"}
-            className={note.pinned ? "text-[var(--color-dorado)]" : "text-[var(--text-faint)] hover:text-[var(--color-dorado)]"}
+        {isOwner ? (
+          <select
+            value={note.type}
+            onChange={(e) => onChange({ type: e.target.value as NoteType })}
+            className="uppercase-label bg-transparent text-[var(--color-dorado)] outline-none"
           >
-            <Star size={16} fill={note.pinned ? "currentColor" : "none"} />
-          </button>
-          <VisibilityBadge v={note.visibleTo} />
-          <button onClick={onDelete} className="text-[var(--text-faint)] hover:text-[var(--color-rojo)]">
-            <Trash2 size={16} />
-          </button>
+            {Object.entries(TYPE_META).map(([k, v]) => (
+              <option key={k} value={k}>
+                {v.label}
+              </option>
+            ))}
+          </select>
+        ) : (
+          <span className="uppercase-label text-[var(--color-dorado)]">
+            {TYPE_META[note.type].label}
+          </span>
+        )}
+        <div className="flex items-center gap-3">
+          {isOwner && (
+            <button
+              onClick={() => onChange({ pinned: !note.pinned })}
+              title={note.pinned ? "Quitar de destacadas" : "Marcar como destacada"}
+              className={note.pinned ? "text-[var(--color-dorado)]" : "text-[var(--text-faint)] hover:text-[var(--color-dorado)]"}
+            >
+              <Star size={16} fill={note.pinned ? "currentColor" : "none"} />
+            </button>
+          )}
+          {!isOwner && note.pinned && (
+            <Star size={16} className="text-[var(--color-dorado)]" fill="currentColor" />
+          )}
+          {isOwner ? (
+            <div className="flex items-center gap-1" title="¿Quién puede ver esta nota?">
+              {USER_LIST.map((u) => {
+                const visible = note.visibleTo.includes(u.id as UserId);
+                return (
+                  <button
+                    key={u.id}
+                    onClick={() => {
+                      const next = visible
+                        ? note.visibleTo.filter((x) => x !== u.id)
+                        : [...note.visibleTo, u.id as UserId];
+                      if (next.length > 0) onChange({ visibleTo: next });
+                    }}
+                    title={u.name}
+                    className={`rounded-full transition-opacity ${visible ? "opacity-100" : "opacity-25 hover:opacity-60"}`}
+                  >
+                    <span
+                      className="grid place-items-center rounded-full font-semibold"
+                      style={{ width: 20, height: 20, background: u.color, color: "#0A1828", fontSize: 8 }}
+                    >
+                      {u.initials}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+          ) : (
+            <VisibilityBadge v={note.visibleTo} />
+          )}
+          {isOwner && (
+            <button onClick={onDelete} className="text-[var(--text-faint)] hover:text-[var(--color-rojo)]">
+              <Trash2 size={16} />
+            </button>
+          )}
         </div>
       </div>
 
       <input
         value={title}
-        onChange={(e) => setTitle(e.target.value)}
+        onChange={(e) => isOwner && setTitle(e.target.value)}
+        readOnly={!isOwner}
         className="w-full bg-transparent font-serif text-2xl outline-none mb-3"
         placeholder="Título…"
       />
@@ -419,8 +442,9 @@ function NoteEditor({
       )}
       <textarea
         value={body}
-        onChange={(e) => setBody(e.target.value)}
-        placeholder="Escribí tu idea o reflexión…"
+        onChange={(e) => isOwner && setBody(e.target.value)}
+        readOnly={!isOwner}
+        placeholder={isOwner ? "Escribí tu idea o reflexión…" : ""}
         rows={10}
         className="w-full bg-transparent outline-none resize-none leading-relaxed text-[var(--text-dim)]"
       />
@@ -482,26 +506,40 @@ function NoteEditor({
       <div className="flex flex-wrap items-center gap-2 mt-4 pt-4 border-t border-[var(--border)]">
         <Tag size={14} className="text-[var(--text-faint)]" />
         {note.tags.map((t) => (
-          <span
-            key={t}
-            onClick={() => onChange({ tags: note.tags.filter((x) => x !== t) })}
-            className="uppercase-label rounded-md border border-[var(--border)] px-2 py-0.5 cursor-pointer hover:border-[var(--color-rojo)] text-[var(--text-dim)]"
-          >
-            {t} ×
-          </span>
+          isOwner ? (
+            <span
+              key={t}
+              onClick={() => onChange({ tags: note.tags.filter((x) => x !== t) })}
+              className="uppercase-label rounded-md border border-[var(--border)] px-2 py-0.5 cursor-pointer hover:border-[var(--color-rojo)] text-[var(--text-dim)]"
+            >
+              {t} ×
+            </span>
+          ) : (
+            <span
+              key={t}
+              className="uppercase-label rounded-md border border-[var(--border)] px-2 py-0.5 text-[var(--text-dim)]"
+            >
+              {t}
+            </span>
+          )
         ))}
-        <input
-          value={tagInput}
-          onChange={(e) => setTagInput(e.target.value)}
-          onKeyDown={(e) => {
-            if (e.key === "Enter" && tagInput.trim()) {
-              onChange({ tags: [...note.tags, tagInput.trim()] });
-              setTagInput("");
-            }
-          }}
-          placeholder="+ etiqueta"
-          className="bg-transparent text-sm outline-none w-24"
-        />
+        {isOwner && (
+          <input
+            value={tagInput}
+            onChange={(e) => setTagInput(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" && tagInput.trim()) {
+                const trimmed = tagInput.trim();
+                if (!note.tags.includes(trimmed)) {
+                  onChange({ tags: [...note.tags, trimmed] });
+                }
+                setTagInput("");
+              }
+            }}
+            placeholder="+ etiqueta"
+            className="bg-transparent text-sm outline-none w-24"
+          />
+        )}
       </div>
 
       {/* Fuentes */}

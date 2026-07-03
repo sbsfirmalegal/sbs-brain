@@ -108,6 +108,8 @@ interface Ctx {
   // chat
   sendMessage: (text: string) => Promise<void>;
   reactMessage: (id: string, emoji: string) => Promise<void>;
+  hasMoreMessages: boolean;
+  loadMoreMessages: () => Promise<void>;
   // notificaciones
   pushNotif: (n: Omit<Notification, "id" | "createdAt" | "read">) => Promise<void>;
   markNotifRead: (id: string) => Promise<void>;
@@ -134,7 +136,10 @@ export function StoreProvider({ children }: { children: ReactNode }) {
 
   const [data, setData] = useState<AppData>(emptyData);
   const [syncing, setSyncing] = useState(false);
+  const [hasMoreMessages, setHasMoreMessages] = useState(true);
   const profileMapRef = useRef<ProfileMap | null>(null);
+  const dataRef = useRef(data);
+  dataRef.current = data;
   const [theme, setTheme] = useState<Theme>(() => {
     const v = localStorage.getItem(THEME_KEY);
     return v && THEMES.includes(v as Theme) ? (v as Theme) : "medio";
@@ -161,11 +166,13 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     }
 
     let cancelled = false;
-    setSyncing(true);
 
-    (async () => {
+    // loadData extrae la carga para poder llamarla también al reconectar
+    const loadData = async (background = false) => {
+      if (!background) setSyncing(true);
       try {
         const map = await loadProfileMap();
+        if (cancelled) return;
         profileMapRef.current = map;
 
         const [
@@ -175,6 +182,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
           notesRes,
           habitsRes,
           goalsRes,
+          // Carga solo los últimos 50 mensajes; el resto se carga bajo demanda
           messagesRes,
           notifsRes,
         ] = await Promise.all([
@@ -184,11 +192,13 @@ export function StoreProvider({ children }: { children: ReactNode }) {
           supabase.from("notes").select("*"),
           supabase.from("habits").select("*"),
           supabase.from("goals").select("*"),
-          supabase.from("messages").select("*").order("created_at"),
+          supabase.from("messages").select("*").order("created_at", { ascending: false }).limit(50),
           supabase.from("notifications").select("*").order("created_at", { ascending: false }),
         ]);
 
         if (cancelled) return;
+        const msgs = (messagesRes.data ?? []).map((r) => rowToMessage(r, map)).reverse();
+        setHasMoreMessages((messagesRes.data?.length ?? 0) === 50);
         setData({
           tasks: (tasksRes.data ?? []).map((r) => rowToTask(r, map)),
           events: (eventsRes.data ?? []).map((r) => rowToEvent(r, map)),
@@ -196,16 +206,18 @@ export function StoreProvider({ children }: { children: ReactNode }) {
           notes: (notesRes.data ?? []).map((r) => rowToNote(r, map)),
           habits: (habitsRes.data ?? []).map((r) => rowToHabit(r, map)),
           goals: (goalsRes.data ?? []).map((r) => rowToGoal(r, map)),
-          messages: (messagesRes.data ?? []).map((r) => rowToMessage(r, map)),
+          messages: msgs,
           notifications: (notifsRes.data ?? []).map((r) => rowToNotif(r, map)),
           pins: {},
         });
       } catch (e) {
         console.error("Error cargando datos:", e);
       } finally {
-        if (!cancelled) setSyncing(false);
+        if (!cancelled && !background) setSyncing(false);
       }
-    })();
+    };
+
+    loadData();
 
     /* ───── Realtime: una suscripción global ───── */
     const channel = supabase.channel("sbs-realtime");
@@ -256,27 +268,47 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     subscribe("messages", "messages", rowToMessage);
     subscribe("notifications", "notifications", rowToNotif, "createdAt");
 
-    channel.subscribe();
+    // Al reconectar el canal, refrescar datos para capturar eventos perdidos offline
+    let needsRefetch = false;
+    channel.subscribe((status) => {
+      if (status === "SUBSCRIBED" && needsRefetch) {
+        needsRefetch = false;
+        loadData(true).catch(console.error);
+      } else if (status === "CHANNEL_ERROR" || status === "TIMED_OUT" || status === "CLOSED") {
+        needsRefetch = true;
+      }
+    });
+
+    // Al volver la app a foreground, refrescar para capturar cambios mientras estaba en background
+    const handleVisibility = () => {
+      if (!cancelled && document.visibilityState === "visible") {
+        loadData(true).catch(console.error);
+      }
+    };
+    document.addEventListener("visibilitychange", handleVisibility);
 
     return () => {
       cancelled = true;
+      document.removeEventListener("visibilitychange", handleVisibility);
       supabase.removeChannel(channel);
     };
   }, [profile]);
 
   /* ─────────── Papelera: purga automática tras TRASH_RETENTION_DAYS ─────────── */
+  // Usa dataRef para no relanzar el efecto en cada cambio de datos — solo corre cada hora
   useEffect(() => {
     if (!currentUser) return;
 
     const purgeExpired = async () => {
+      const d = dataRef.current;
       const cutoff = Date.now() - TRASH_RETENTION_DAYS * 24 * 60 * 60 * 1000;
       const tables: { table: string; rows: { id: string; deletedAt?: string }[] }[] = [
-        { table: "tasks", rows: data.tasks },
-        { table: "events", rows: data.events },
-        { table: "meetings", rows: data.meetings },
-        { table: "notes", rows: data.notes },
-        { table: "habits", rows: data.habits },
-        { table: "goals", rows: data.goals },
+        { table: "tasks", rows: d.tasks },
+        { table: "events", rows: d.events },
+        { table: "meetings", rows: d.meetings },
+        { table: "notes", rows: d.notes },
+        { table: "habits", rows: d.habits },
+        { table: "goals", rows: d.goals },
       ];
       for (const { table, rows } of tables) {
         const expiredIds = rows
@@ -290,7 +322,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     purgeExpired();
     const i = setInterval(purgeExpired, 60 * 60 * 1000);
     return () => clearInterval(i);
-  }, [currentUser, data.tasks, data.events, data.meetings, data.notes, data.habits, data.goals]);
+  }, [currentUser]); // dataRef siempre tiene el valor fresco; no depender de las listas
 
   /* ─────────── Mutaciones ─────────── */
   const value = useMemo<Ctx>(() => {
@@ -300,6 +332,23 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       return m;
     };
     const u = () => currentUser as UserId;
+
+    const loadMoreMessages = async () => {
+      const m = profileMapRef.current;
+      if (!m) return;
+      const d = dataRef.current;
+      const oldest = d.messages[0];
+      if (!oldest) return;
+      const { data: older } = await supabase
+        .from("messages")
+        .select("*")
+        .order("created_at", { ascending: false })
+        .lt("created_at", oldest.createdAt)
+        .limit(50);
+      const newMsgs = (older ?? []).map((r) => rowToMessage(r, m)).reverse();
+      setData((prev) => ({ ...prev, messages: [...newMsgs, ...prev.messages] }));
+      setHasMoreMessages((older?.length ?? 0) === 50);
+    };
 
     const createTask = async (t: Partial<Task> & { title: string; owner: UserId }) => {
       const m = requireMap();
@@ -315,11 +364,12 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         },
         m
       );
-      const { data: ins } = await supabase
+      const { data: ins, error: insErr } = await supabase
         .from("tasks")
         .insert(row)
         .select()
         .single();
+      if (insErr) console.error("[store] addTask:", insErr.message);
       const me = currentUser;
       if (ins && me && t.owner !== me) {
         await supabase.from("notifications").insert({
@@ -337,7 +387,10 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     };
 
     const nextDue = (due: string | null, recurrence: Task["recurrence"]) => {
-      const base = due ? parseISO(due) : new Date();
+      const today = new Date();
+      // Si la due date ya pasó, se parte de hoy para evitar cadenas de tareas "atrasadas"
+      const dueDate = due ? parseISO(due) : null;
+      const base = dueDate && dueDate > today ? new Date(dueDate) : today;
       base.setDate(base.getDate() + (recurrence === "semanal" ? 7 : 1));
       return iso(base);
     };
@@ -363,28 +416,41 @@ export function StoreProvider({ children }: { children: ReactNode }) {
           .from("tasks")
           .update({ done, completed_at: done ? todayISO() : null })
           .eq("id", id);
-        // tarea recurrente cumplida: se genera la siguiente instancia automáticamente
+        // Tarea recurrente cumplida: genera la siguiente instancia solo si no existe ya una pendiente
         if (done && t.recurrence) {
-          await createTask({
-            title: t.title,
-            owner: t.owner,
-            visibleTo: t.visibleTo,
-            priority: t.priority,
-            area: t.area,
-            folio: t.folio,
-            recurrence: t.recurrence,
-            linkedHabitId: t.linkedHabitId,
-            due: nextDue(t.due, t.recurrence),
-            subtasks: t.subtasks?.map((s) => ({ ...s, done: false })),
-          });
+          const hasPending = data.tasks.some(
+            (x) =>
+              x.id !== id &&
+              !x.done &&
+              !x.deletedAt &&
+              x.title === t.title &&
+              x.recurrence === t.recurrence &&
+              x.owner === t.owner
+          );
+          if (!hasPending) {
+            await createTask({
+              title: t.title,
+              owner: t.owner,
+              visibleTo: t.visibleTo,
+              priority: t.priority,
+              area: t.area,
+              folio: t.folio,
+              recurrence: t.recurrence,
+              linkedHabitId: t.linkedHabitId,
+              due: nextDue(t.due, t.recurrence),
+              subtasks: t.subtasks?.map((s) => ({ ...s, done: false })),
+            });
+          }
         }
       },
       updateTask: async (id, patch) => {
         const m = requireMap();
-        await supabase.from("tasks").update(taskToRow(patch, m)).eq("id", id);
+        const { error } = await supabase.from("tasks").update(taskToRow(patch, m)).eq("id", id);
+        if (error) console.error("[store] updateTask:", error.message);
       },
       deleteTask: async (id) => {
-        await supabase.from("tasks").update({ deleted_at: new Date().toISOString() }).eq("id", id);
+        const { error } = await supabase.from("tasks").update({ deleted_at: new Date().toISOString() }).eq("id", id);
+        if (error) console.error("[store] deleteTask:", error.message);
       },
       postponeTask: async (id, newDue) => {
         const t = data.tasks.find((x) => x.id === id);
@@ -445,10 +511,12 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       },
       updateEvent: async (id, patch) => {
         const m = requireMap();
-        await supabase.from("events").update(eventToRow(patch, m)).eq("id", id);
+        const { error } = await supabase.from("events").update(eventToRow(patch, m)).eq("id", id);
+        if (error) console.error("[store] updateEvent:", error.message);
       },
       deleteEvent: async (id) => {
-        await supabase.from("events").update({ deleted_at: new Date().toISOString() }).eq("id", id);
+        const { error } = await supabase.from("events").update({ deleted_at: new Date().toISOString() }).eq("id", id);
+        if (error) console.error("[store] deleteEvent:", error.message);
       },
 
       /* ─── MEETINGS ─── */
@@ -478,10 +546,12 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       },
       updateMeeting: async (id, patch) => {
         const m = requireMap();
-        await supabase.from("meetings").update(meetingToRow(patch, m)).eq("id", id);
+        const { error } = await supabase.from("meetings").update(meetingToRow(patch, m)).eq("id", id);
+        if (error) console.error("[store] updateMeeting:", error.message);
       },
       deleteMeeting: async (id) => {
-        await supabase.from("meetings").update({ deleted_at: new Date().toISOString() }).eq("id", id);
+        const { error } = await supabase.from("meetings").update({ deleted_at: new Date().toISOString() }).eq("id", id);
+        if (error) console.error("[store] deleteMeeting:", error.message);
       },
 
       /* ─── NOTES ─── */
@@ -509,11 +579,16 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         const m = requireMap();
         const row = noteToRow(patch, m);
         row.updated_at = new Date().toISOString();
-        await supabase.from("notes").update(row).eq("id", id);
+        const { error } = await supabase.from("notes").update(row).eq("id", id);
+        if (error) console.error("[store] updateNote:", error.message);
       },
       deleteNote: async (id) => {
-        await supabase.from("notes").update({ deleted_at: new Date().toISOString() }).eq("id", id);
+        const { error } = await supabase.from("notes").update({ deleted_at: new Date().toISOString() }).eq("id", id);
+        if (error) console.error("[store] deleteNote:", error.message);
       },
+
+      hasMoreMessages,
+      loadMoreMessages,
 
       /* ─── CHAT ─── */
       sendMessage: async (text) => {
@@ -603,10 +678,12 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       },
       updateHabit: async (id, patch) => {
         const m = requireMap();
-        await supabase.from("habits").update(habitToRow(patch, m)).eq("id", id);
+        const { error } = await supabase.from("habits").update(habitToRow(patch, m)).eq("id", id);
+        if (error) console.error("[store] updateHabit:", error.message);
       },
       deleteHabit: async (id) => {
-        await supabase.from("habits").update({ deleted_at: new Date().toISOString() }).eq("id", id);
+        const { error } = await supabase.from("habits").update({ deleted_at: new Date().toISOString() }).eq("id", id);
+        if (error) console.error("[store] deleteHabit:", error.message);
       },
 
       /* ─── GOALS ─── */
@@ -633,10 +710,12 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       },
       updateGoal: async (id, patch) => {
         const m = requireMap();
-        await supabase.from("goals").update(goalToRow(patch, m)).eq("id", id);
+        const { error } = await supabase.from("goals").update(goalToRow(patch, m)).eq("id", id);
+        if (error) console.error("[store] updateGoal:", error.message);
       },
       deleteGoal: async (id) => {
-        await supabase.from("goals").update({ deleted_at: new Date().toISOString() }).eq("id", id);
+        const { error } = await supabase.from("goals").update({ deleted_at: new Date().toISOString() }).eq("id", id);
+        if (error) console.error("[store] deleteGoal:", error.message);
       },
 
       /* ─── PAPELERA ─── */
@@ -657,7 +736,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
           (it) => (!currentUser || it.visibleTo.includes(u())) && !(it as any).deletedAt
         ),
     };
-  }, [data, currentUser, theme, sidebarCollapsed, syncing, signOut]);
+  }, [data, currentUser, theme, sidebarCollapsed, syncing, hasMoreMessages, signOut]);
 
   return (
     <StoreContext.Provider value={value}>{children}</StoreContext.Provider>

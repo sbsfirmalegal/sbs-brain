@@ -9,6 +9,9 @@ import {
   Play,
   Trophy,
   Minus,
+  Pencil,
+  X,
+  Link2,
 } from "lucide-react";
 import { useStore } from "../store/store";
 import { SectionTitle, Card, AvatarStack, VisibilityBadge, Chip } from "../components/ui";
@@ -98,6 +101,48 @@ function GoalCard({
   onUpdate: (p: Partial<Goal>) => void;
   onDelete: () => void;
 }) {
+  const { currentUser, data, pushNotif } = useStore();
+  const isOwner = goal.owner === currentUser;
+  const [editing, setEditing] = useState(false);
+  const [editTitle, setEditTitle] = useState(goal.title);
+  const [editDesc, setEditDesc] = useState(goal.description ?? "");
+  const [editDue, setEditDue] = useState(goal.due ?? "");
+  const [editTarget, setEditTarget] = useState(goal.target?.toString() ?? "");
+  const [editUnit, setEditUnit] = useState(goal.unit ?? "");
+
+  const myHabits = data.habits.filter(
+    (h) => h.owner === currentUser && !h.archived && !h.deletedAt
+  );
+
+  function saveEdit() {
+    onUpdate({
+      title: editTitle.trim() || goal.title,
+      description: editDesc.trim() || undefined,
+      due: editDue || null,
+      target: editTarget ? parseInt(editTarget) : undefined,
+      unit: editUnit.trim() || undefined,
+    });
+    setEditing(false);
+  }
+
+  function toggleLinkedHabit(habitId: string) {
+    const ids = goal.linkedHabitIds ?? [];
+    const next = ids.includes(habitId) ? ids.filter((x) => x !== habitId) : [...ids, habitId];
+    onUpdate({ linkedHabitIds: next });
+  }
+
+  function markLograda() {
+    onUpdate({ status: "lograda" });
+    goal.visibleTo.forEach((uid) => {
+      pushNotif({
+        kind: "meta-lograda",
+        recipient: uid,
+        title: `🏆 Meta lograda: ${goal.title}`,
+        link: "/metas",
+        refId: goal.id,
+      });
+    });
+  }
   const pct = goal.target
     ? Math.min(100, Math.round(((goal.current ?? 0) / goal.target) * 100))
     : 0;
@@ -108,6 +153,91 @@ function GoalCard({
   const ScopeIcon = goal.scope === "firma" ? Building2 : Heart;
   const scopeColor =
     goal.scope === "firma" ? "var(--color-dorado)" : "var(--color-verde)";
+
+  if (editing && isOwner) {
+    return (
+      <Card className="p-5 animate-fadein space-y-3">
+        <div className="flex items-center justify-between mb-1">
+          <span className="uppercase-label text-[var(--text-faint)]">Editar meta</span>
+          <button onClick={() => setEditing(false)} className="text-[var(--text-faint)] hover:text-[var(--text)]">
+            <X size={16} />
+          </button>
+        </div>
+        <input
+          autoFocus
+          value={editTitle}
+          onChange={(e) => setEditTitle(e.target.value)}
+          className="w-full bg-transparent font-serif text-xl outline-none border-b border-[var(--border)] pb-2"
+        />
+        <textarea
+          value={editDesc}
+          onChange={(e) => setEditDesc(e.target.value)}
+          placeholder="Descripción (opcional)"
+          rows={2}
+          className="w-full bg-transparent text-sm outline-none border border-[var(--border)] rounded-lg p-2 resize-none"
+        />
+        <div className="flex flex-wrap gap-2 items-center">
+          <div className="flex items-center gap-2">
+            <Target size={13} className="text-[var(--text-faint)]" />
+            <input
+              type="number"
+              value={editTarget}
+              onChange={(e) => setEditTarget(e.target.value)}
+              placeholder="Meta"
+              className="w-20 rounded-lg border border-[var(--border)] bg-[var(--surface-2)] px-2 py-1.5 text-sm tnum"
+            />
+            <input
+              value={editUnit}
+              onChange={(e) => setEditUnit(e.target.value)}
+              placeholder="unidad"
+              className="w-28 rounded-lg border border-[var(--border)] bg-[var(--surface-2)] px-2 py-1.5 text-sm"
+            />
+          </div>
+          <input
+            type="date"
+            value={editDue}
+            onChange={(e) => setEditDue(e.target.value)}
+            className="rounded-lg border border-[var(--border)] bg-[var(--surface-2)] px-2 py-1.5 text-sm"
+          />
+        </div>
+        {/* Vinculación de hábitos */}
+        {myHabits.length > 0 && (
+          <div>
+            <div className="flex items-center gap-1.5 uppercase-label text-[var(--text-faint)] mb-2">
+              <Link2 size={12} /> Hábitos vinculados
+            </div>
+            <div className="flex flex-wrap gap-1.5">
+              {myHabits.map((h) => {
+                const linked = (goal.linkedHabitIds ?? []).includes(h.id);
+                return (
+                  <button
+                    key={h.id}
+                    onClick={() => toggleLinkedHabit(h.id)}
+                    className={`flex items-center gap-1 rounded-lg border px-2 py-1 text-xs transition-all ${linked ? "border-[var(--color-dorado)] text-[var(--text)]" : "border-[var(--border)] text-[var(--text-faint)]"}`}
+                  >
+                    {h.icon ?? "•"} {h.name}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        )}
+        <div className="flex justify-end gap-2 pt-1">
+          <button onClick={() => setEditing(false)} className="uppercase-label text-[var(--text-faint)] px-3">
+            Cancelar
+          </button>
+          <button
+            onClick={saveEdit}
+            disabled={!editTitle.trim()}
+            className="rounded-lg px-4 py-1.5 text-sm font-semibold disabled:opacity-40"
+            style={{ background: "var(--color-dorado)", color: "#0A1828" }}
+          >
+            Guardar
+          </button>
+        </div>
+      </Card>
+    );
+  }
 
   return (
     <Card className="p-5 group flex flex-col">
@@ -154,23 +284,40 @@ function GoalCard({
               }}
             />
           </div>
-          <div className="flex items-center gap-2 mt-2">
-            <button
-              onClick={() =>
-                onUpdate({ current: Math.max(0, (goal.current ?? 0) - 1) })
-              }
-              className="rounded-lg border border-[var(--border)] p-1 hover:border-[var(--border-strong)]"
-            >
-              <Minus size={13} />
-            </button>
-            <button
-              onClick={() => onUpdate({ current: (goal.current ?? 0) + 1 })}
-              className="rounded-lg border border-[var(--border)] p-1 hover:border-[var(--border-strong)]"
-            >
-              <Plus size={13} />
-            </button>
-            <span className="text-xs text-[var(--text-faint)]">avance</span>
-          </div>
+          {isOwner && (
+            <div className="flex items-center gap-2 mt-2">
+              <button
+                onClick={() =>
+                  onUpdate({ current: Math.max(0, (goal.current ?? 0) - 1) })
+                }
+                className="rounded-lg border border-[var(--border)] p-1 hover:border-[var(--border-strong)]"
+              >
+                <Minus size={13} />
+              </button>
+              <button
+                onClick={() => onUpdate({ current: (goal.current ?? 0) + 1 })}
+                className="rounded-lg border border-[var(--border)] p-1 hover:border-[var(--border-strong)]"
+              >
+                <Plus size={13} />
+              </button>
+              <span className="text-xs text-[var(--text-faint)]">avance</span>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Hábitos vinculados */}
+      {(goal.linkedHabitIds ?? []).length > 0 && (
+        <div className="mt-3 flex flex-wrap gap-1">
+          {(goal.linkedHabitIds ?? []).map((hid) => {
+            const h = data.habits.find((x) => x.id === hid);
+            if (!h) return null;
+            return (
+              <span key={hid} className="uppercase-label rounded-md border border-[var(--border)] px-1.5 py-0.5 flex items-center gap-1 text-[var(--text-dim)]">
+                <Link2 size={9} /> {h.icon ?? ""} {h.name}
+              </span>
+            );
+          })}
         </div>
       )}
 
@@ -188,40 +335,49 @@ function GoalCard({
           )}
           <AvatarStack ids={goal.visibleTo} size={20} />
         </div>
-        <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-          {goal.status !== "lograda" && pct >= 100 && (
+        {isOwner && (
+          <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+            {goal.status !== "lograda" && pct >= 100 && (
+              <button
+                onClick={markLograda}
+                className="rounded-lg p-1.5 hover:bg-[var(--surface-2)]"
+                title="Marcar como lograda"
+              >
+                <Trophy size={14} className="text-[var(--color-dorado)]" />
+              </button>
+            )}
+            {goal.status === "activa" ? (
+              <button
+                onClick={() => onUpdate({ status: "pausada" })}
+                className="rounded-lg p-1.5 hover:bg-[var(--surface-2)]"
+                title="Pausar"
+              >
+                <Pause size={14} />
+              </button>
+            ) : goal.status === "pausada" ? (
+              <button
+                onClick={() => onUpdate({ status: "activa" })}
+                className="rounded-lg p-1.5 hover:bg-[var(--surface-2)]"
+                title="Reanudar"
+              >
+                <Play size={14} />
+              </button>
+            ) : null}
             <button
-              onClick={() => onUpdate({ status: "lograda" })}
+              onClick={() => setEditing(true)}
               className="rounded-lg p-1.5 hover:bg-[var(--surface-2)]"
-              title="Marcar como lograda"
+              title="Editar meta"
             >
-              <Trophy size={14} className="text-[var(--color-dorado)]" />
+              <Pencil size={14} />
             </button>
-          )}
-          {goal.status === "activa" ? (
             <button
-              onClick={() => onUpdate({ status: "pausada" })}
-              className="rounded-lg p-1.5 hover:bg-[var(--surface-2)]"
-              title="Pausar"
+              onClick={onDelete}
+              className="rounded-lg p-1.5 hover:bg-[var(--surface-2)] hover:text-[var(--color-rojo)]"
             >
-              <Pause size={14} />
+              <Trash2 size={14} />
             </button>
-          ) : goal.status === "pausada" ? (
-            <button
-              onClick={() => onUpdate({ status: "activa" })}
-              className="rounded-lg p-1.5 hover:bg-[var(--surface-2)]"
-              title="Reanudar"
-            >
-              <Play size={14} />
-            </button>
-          ) : null}
-          <button
-            onClick={onDelete}
-            className="rounded-lg p-1.5 hover:bg-[var(--surface-2)] hover:text-[var(--color-rojo)]"
-          >
-            <Trash2 size={14} />
-          </button>
-        </div>
+          </div>
+        )}
       </div>
 
       {goal.status === "lograda" && (

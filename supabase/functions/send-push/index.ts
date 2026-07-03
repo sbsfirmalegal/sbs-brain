@@ -3,6 +3,9 @@
 //
 // Secrets necesarios (Supabase → Edge Functions → Secrets):
 //   VAPID_PUBLIC_KEY, VAPID_PRIVATE_KEY, VAPID_SUBJECT (mailto:...)
+//   WEBHOOK_SECRET — cadena aleatoria; configurar en:
+//     Supabase → Database → Webhooks → send-push → HTTP Headers:
+//     "Authorization: Bearer <mismo valor>"
 // SUPABASE_URL y SUPABASE_SERVICE_ROLE_KEY los inyecta Supabase automáticamente.
 
 import webpush from "npm:web-push@3.6.7";
@@ -11,6 +14,7 @@ import { createClient } from "npm:@supabase/supabase-js@2";
 const VAPID_PUBLIC = Deno.env.get("VAPID_PUBLIC_KEY")!;
 const VAPID_PRIVATE = Deno.env.get("VAPID_PRIVATE_KEY")!;
 const VAPID_SUBJECT = Deno.env.get("VAPID_SUBJECT") ?? "mailto:barreranelson62@gmail.com";
+const WEBHOOK_SECRET = Deno.env.get("WEBHOOK_SECRET");
 
 webpush.setVapidDetails(VAPID_SUBJECT, VAPID_PUBLIC, VAPID_PRIVATE);
 
@@ -35,6 +39,15 @@ interface WebhookPayload {
 }
 
 Deno.serve(async (req) => {
+  // Verificar secreto de webhook para evitar llamadas no autorizadas
+  if (WEBHOOK_SECRET) {
+    const authHeader = req.headers.get("Authorization");
+    const token = authHeader?.replace("Bearer ", "").trim();
+    if (token !== WEBHOOK_SECRET) {
+      return new Response("No autorizado", { status: 401 });
+    }
+  }
+
   try {
     const payload = (await req.json()) as WebhookPayload;
 

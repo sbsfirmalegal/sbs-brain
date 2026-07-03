@@ -34,11 +34,13 @@ function groupByDay(messages: ChatMessage[]) {
 }
 
 export function Chat() {
-  const { data, currentUser, sendMessage, reactMessage } = useStore();
+  const { data, currentUser, sendMessage, reactMessage, hasMoreMessages, loadMoreMessages } = useStore();
   const [text, setText] = useState("");
   const [emojiFor, setEmojiFor] = useState<string | null>(null);
+  const [loadingMore, setLoadingMore] = useState(false);
   const bottomRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
+  const scrollRef = useRef<HTMLDivElement>(null);
 
   const messages = data.messages ?? [];
   const groups = groupByDay(messages);
@@ -46,6 +48,18 @@ export function Chat() {
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages.length]);
+
+  async function handleLoadMore() {
+    const scroller = scrollRef.current;
+    const prevScrollHeight = scroller?.scrollHeight ?? 0;
+    setLoadingMore(true);
+    await loadMoreMessages();
+    setLoadingMore(false);
+    // Mantener posición de scroll al insertar mensajes arriba
+    if (scroller) {
+      scroller.scrollTop = scroller.scrollHeight - prevScrollHeight;
+    }
+  }
 
   function submit() {
     const t = text.trim();
@@ -76,7 +90,20 @@ export function Chat() {
       </div>
 
       {/* Mensajes */}
-      <div className="flex-1 overflow-y-auto px-4 py-4 space-y-6">
+      <div ref={scrollRef} className="flex-1 overflow-y-auto px-4 py-4 space-y-6">
+        {/* Botón para cargar mensajes anteriores */}
+        {hasMoreMessages && (
+          <div className="flex justify-center py-2">
+            <button
+              onClick={handleLoadMore}
+              disabled={loadingMore}
+              className="uppercase-label text-[var(--text-faint)] hover:text-[var(--color-dorado)] disabled:opacity-40 px-3 py-1.5 rounded-lg border border-[var(--border)] hover:border-[var(--color-dorado)] transition-colors"
+            >
+              {loadingMore ? "Cargando…" : "Ver mensajes anteriores"}
+            </button>
+          </div>
+        )}
+
         {groups.map((g) => (
           <div key={g.label}>
             {/* Separador de día */}

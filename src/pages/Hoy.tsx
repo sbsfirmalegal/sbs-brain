@@ -31,7 +31,7 @@ export function Hoy() {
   const u = currentUser ? USERS[currentUser] : null;
   const today = todayISO();
   const myHabits = data.habits.filter(
-    (h) => h.owner === currentUser && !h.archived
+    (h) => h.owner === currentUser && !h.archived && !h.deletedAt
   );
 
   const myTasks = visible(data.tasks).filter((t) => !t.done);
@@ -39,8 +39,16 @@ export function Hoy() {
     .filter((e) => e.date === today)
     .sort((a, b) => a.start.localeCompare(b.start));
 
+  const now = new Date();
+  const nowHM = `${String(now.getHours()).padStart(2, "0")}:${String(now.getMinutes()).padStart(2, "0")}`;
+
   const nextMeeting = visible(data.events)
-    .filter((e) => e.kind === "reunion" && e.date >= today)
+    .filter((e) => {
+      if (e.kind !== "reunion") return false;
+      if (e.date > today) return true;
+      if (e.date === today) return (e.end ?? e.start) >= nowHM;
+      return false;
+    })
     .sort((a, b) => (a.date + a.start).localeCompare(b.date + b.start))[0];
   const meeting = nextMeeting?.meetingId
     ? data.meetings.find((m) => m.id === nextMeeting.meetingId)
@@ -49,9 +57,6 @@ export function Hoy() {
   const overdue = myTasks.filter((t) => dueBucket(t.due) === "atrasada");
   const dueToday = myTasks.filter((t) => dueBucket(t.due) === "hoy");
   const thisWeek = myTasks.filter((t) => dueBucket(t.due) === "semana");
-
-  const now = new Date();
-  const nowHM = `${String(now.getHours()).padStart(2, "0")}:${String(now.getMinutes()).padStart(2, "0")}`;
 
   return (
     <div className="grid lg:grid-cols-[1fr_300px] gap-8">

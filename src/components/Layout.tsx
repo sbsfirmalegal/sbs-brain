@@ -348,7 +348,7 @@ export function Layout() {
       )}
 
       <QuickCapture />
-      <CommandSearch open={searchOpen} onClose={() => setSearchOpen(false)} />
+      <CommandSearch open={searchOpen} onClose={() => setSearchOpen(false)} onOpen={() => setSearchOpen(true)} />
     </div>
   );
 }

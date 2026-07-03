@@ -8,6 +8,9 @@ import {
   Trophy,
   Target,
   Clock,
+  Pencil,
+  Archive,
+  X,
 } from "lucide-react";
 import { useStore } from "../store/store";
 import { SectionTitle, Card, PriorityBadge } from "../components/ui";
@@ -43,7 +46,7 @@ const RISK_COLOR: Record<string, string> = {
 };
 
 export function Habitos() {
-  const { data, currentUser, addHabit, toggleHabitToday, deleteHabit } = useStore();
+  const { data, currentUser, addHabit, toggleHabitToday, updateHabit, deleteHabit } = useStore();
   const [creating, setCreating] = useState(false);
   const today = todayISO();
   const days = last7Days();
@@ -62,7 +65,11 @@ export function Habitos() {
   );
 
   const pending = habits
-    .filter((h) => !h.completions.includes(today))
+    .filter((h) =>
+      h.frequency === "semanal"
+        ? completionsThisWeek(h.completions) < (h.weeklyTarget ?? 7)
+        : !h.completions.includes(today)
+    )
     .sort((a, b) => {
       const pr = { alta: 0, media: 1, baja: 2 };
       const pa = pr[a.priority ?? "media"];
@@ -225,6 +232,7 @@ export function Habitos() {
             days={days}
             onToggle={(d) => toggleHabitToday(h.id, d)}
             onDelete={() => deleteHabit(h.id)}
+            onUpdate={(p) => updateHabit(h.id, p)}
           />
         ))}
 
@@ -344,10 +352,13 @@ function Metric({ label, value, suffix = "" }: { label: string; value: number; s
 
 function ConsistencyCalendar({ habits }: { habits: Habit[] }) {
   const window = lastNDays(91);
+  const expectedPerDay = habits.reduce(
+    (sum, h) => sum + (h.frequency === "diario" ? 1 : (h.weeklyTarget ?? 7) / 7),
+    0
+  );
   const cells = window.map((d) => {
-    const expected = habits.filter((h) => h.frequency === "diario" || true).length;
     const done = habits.filter((h) => h.completions.includes(d)).length;
-    const pct = expected ? done / expected : 0;
+    const pct = expectedPerDay ? done / expectedPerDay : 0;
     return { date: d, pct };
   });
 
@@ -382,18 +393,113 @@ function HabitCard({
   days,
   onToggle,
   onDelete,
+  onUpdate,
 }: {
   habit: Habit;
   days: string[];
   onToggle: (iso: string) => void;
   onDelete: () => void;
+  onUpdate: (p: Partial<Habit>) => void;
 }) {
+  const [editing, setEditing] = useState(false);
+  const [editName, setEditName] = useState(habit.name);
+  const [editIcon, setEditIcon] = useState(habit.icon ?? ICONS[0]);
+  const [editColor, setEditColor] = useState(habit.color ?? COLORS[0]);
+  const [editTime, setEditTime] = useState(habit.recommendedTime ?? "");
+
   const streak = currentStreak(habit.completions);
   const best = bestStreak(habit.completions);
   const weekDone = completionsThisWeek(habit.completions);
   const today = todayISO();
   const doneToday = habit.completions.includes(today);
   const toRecord = Math.max(0, best - streak);
+
+  function saveEdit() {
+    onUpdate({
+      name: editName.trim() || habit.name,
+      icon: editIcon,
+      color: editColor,
+      recommendedTime: editTime || undefined,
+    });
+    setEditing(false);
+  }
+
+  if (editing) {
+    return (
+      <Card className="p-4 animate-fadein">
+        <div className="flex items-center gap-3 mb-3">
+          <span
+            className="grid place-items-center rounded-xl shrink-0 text-xl"
+            style={{ width: 44, height: 44, background: editColor, color: "#0A1828" }}
+          >
+            {editIcon}
+          </span>
+          <input
+            autoFocus
+            value={editName}
+            onChange={(e) => setEditName(e.target.value)}
+            className="flex-1 bg-transparent font-medium outline-none border-b border-[var(--border)] pb-1"
+          />
+        </div>
+        <div className="flex flex-wrap gap-1.5 mb-3">
+          {ICONS.map((i) => (
+            <button
+              key={i}
+              onClick={() => setEditIcon(i)}
+              className={`text-lg w-8 h-8 rounded-lg grid place-items-center ${editIcon === i ? "bg-[var(--surface-2)] ring-1 ring-[var(--color-dorado)]" : "hover:bg-[var(--surface-2)]"}`}
+            >
+              {i}
+            </button>
+          ))}
+        </div>
+        <div className="flex flex-wrap gap-2 mb-3">
+          {COLORS.map((c) => (
+            <button
+              key={c}
+              onClick={() => setEditColor(c)}
+              className="rounded-full"
+              style={{
+                width: 22,
+                height: 22,
+                background: c,
+                boxShadow: editColor === c ? "0 0 0 2px var(--bg), 0 0 0 4px var(--color-dorado)" : undefined,
+              }}
+            />
+          ))}
+        </div>
+        <div className="flex items-center gap-2 mb-3">
+          <Clock size={13} className="text-[var(--text-faint)]" />
+          <input
+            type="time"
+            value={editTime}
+            onChange={(e) => setEditTime(e.target.value)}
+            className="rounded-lg border border-[var(--border)] bg-[var(--surface-2)] px-2 py-1.5 text-sm"
+          />
+          <span className="text-xs text-[var(--text-faint)]">Hora recomendada</span>
+        </div>
+        <div className="flex items-center justify-between mt-2">
+          <button
+            onClick={() => { onUpdate({ archived: true }); setEditing(false); }}
+            className="flex items-center gap-1.5 text-xs text-[var(--text-faint)] hover:text-[var(--color-ambar)]"
+          >
+            <Archive size={13} /> Archivar hábito
+          </button>
+          <div className="flex gap-2">
+            <button onClick={() => setEditing(false)} className="uppercase-label text-[var(--text-faint)] px-3">
+              <X size={15} />
+            </button>
+            <button
+              onClick={saveEdit}
+              className="rounded-lg px-3 py-1.5 text-xs font-semibold"
+              style={{ background: "var(--color-dorado)", color: "#0A1828" }}
+            >
+              Guardar
+            </button>
+          </div>
+        </div>
+      </Card>
+    );
+  }
 
   return (
     <Card className="p-4 group">
@@ -462,6 +568,13 @@ function HabitCard({
           })}
         </div>
 
+        <button
+          onClick={() => setEditing(true)}
+          className="text-[var(--text-faint)] hover:text-[var(--color-dorado)] opacity-0 group-hover:opacity-100 transition-opacity"
+          title="Editar hábito"
+        >
+          <Pencil size={14} />
+        </button>
         <button
           onClick={onDelete}
           className="text-[var(--text-faint)] hover:text-[var(--color-rojo)] opacity-0 group-hover:opacity-100 transition-opacity"

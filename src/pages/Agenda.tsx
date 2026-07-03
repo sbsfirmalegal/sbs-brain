@@ -406,8 +406,13 @@ function WeekView({
     return Array.from({ length: 7 }, (_, i) => addDays(start, i));
   }, [cursor]);
 
-  const hours = Array.from({ length: 14 }, (_, i) => 7 + i); // 7am – 8pm
   const HOUR_HEIGHT = 56; // px por hora
+  // Rango dinámico: 1h antes del primer evento hasta 1h después del último, mínimo 7-20
+  const allEventStarts = days.flatMap((d) => (byDay[iso(d)] ?? []).map((e) => parseInt(e.start)));
+  const minH = allEventStarts.length ? Math.max(6, Math.min(...allEventStarts) - 1) : 7;
+  const allEventEnds = days.flatMap((d) => (byDay[iso(d)] ?? []).map((e) => e.end ? parseInt(e.end) : parseInt(e.start) + 1));
+  const maxH = allEventEnds.length ? Math.min(22, Math.max(...allEventEnds) + 1) : 20;
+  const hours = Array.from({ length: Math.max(maxH - minH + 1, 6) }, (_, i) => minH + i);
 
   const [, tick] = useState(0);
   useEffect(() => {
@@ -416,13 +421,13 @@ function WeekView({
   }, []);
 
   const now = new Date();
-  const minsSince7 = (now.getHours() - 7) * 60 + now.getMinutes();
-  const nowPosition = (minsSince7 / 60) * HOUR_HEIGHT;
-  const showNow = minsSince7 >= 0 && minsSince7 <= 14 * 60;
+  const minsSinceMin = (now.getHours() - minH) * 60 + now.getMinutes();
+  const nowPosition = (minsSinceMin / 60) * HOUR_HEIGHT;
+  const showNow = now.getHours() >= minH && now.getHours() <= maxH;
 
   const evPosition = (start: string, end?: string) => {
     const [h, m] = start.split(":").map(Number);
-    const top = ((h - 7) * 60 + m) * (HOUR_HEIGHT / 60);
+    const top = ((h - minH) * 60 + m) * (HOUR_HEIGHT / 60);
     let height = HOUR_HEIGHT * 0.85;
     if (end) {
       const [eh, em] = end.split(":").map(Number);
@@ -435,9 +440,9 @@ function WeekView({
   function timeFromY(y: number): string {
     const hourFloat = y / HOUR_HEIGHT;
     const totalMins = Math.round(hourFloat * 2) * 30; // snap a 30 min
-    const h = Math.floor(totalMins / 60) + 7;
+    const h = Math.floor(totalMins / 60) + minH;
     const m = totalMins % 60;
-    return `${String(Math.min(h, 20)).padStart(2, "0")}:${String(m).padStart(2, "0")}`;
+    return `${String(Math.min(h, 22)).padStart(2, "0")}:${String(m).padStart(2, "0")}`;
   }
 
   return (
@@ -640,7 +645,11 @@ function DayView({
   const key = iso(cursor);
   const evs = byDay[key] || [];
   const allDayEvs = allDayByDay[key] || [];
-  const hours = Array.from({ length: 14 }, (_, i) => 7 + i); // 7am – 8pm
+  const dayStarts = evs.map((e) => parseInt(e.start));
+  const dayEnds = evs.map((e) => (e.end ? parseInt(e.end) : parseInt(e.start) + 1));
+  const dayMinH = dayStarts.length ? Math.max(6, Math.min(...dayStarts) - 1) : 7;
+  const dayMaxH = dayEnds.length ? Math.min(22, Math.max(...dayEnds) + 1) : 20;
+  const hours = Array.from({ length: Math.max(dayMaxH - dayMinH + 1, 6) }, (_, i) => dayMinH + i);
 
   const [, tick] = useState(0);
   useEffect(() => {
@@ -650,11 +659,11 @@ function DayView({
 
   const isCurrentDay = isSameDay(cursor, new Date());
   const now = new Date();
-  const minsSince7 = (now.getHours() - 7) * 60 + now.getMinutes();
+  const minsSince7 = (now.getHours() - dayMinH) * 60 + now.getMinutes();
 
   const evPosition = (start: string, end?: string) => {
     const [h, m] = start.split(":").map(Number);
-    const top = ((h - 7) * 60 + m) * (60 / 60);
+    const top = ((h - dayMinH) * 60 + m) * (60 / 60);
     let height = 50;
     if (end) {
       const [eh, em] = end.split(":").map(Number);
@@ -664,10 +673,10 @@ function DayView({
   };
 
   function timeFromY(y: number): string {
-    const totalMins = Math.round(y / 60) * 60 + 7 * 60;
+    const totalMins = Math.round(y / 60) * 60 + dayMinH * 60;
     const h = Math.floor(totalMins / 60);
     const m = totalMins % 60;
-    return `${String(Math.min(h, 20)).padStart(2, "0")}:${String(m).padStart(2, "0")}`;
+    return `${String(Math.min(h, 22)).padStart(2, "0")}:${String(m).padStart(2, "0")}`;
   }
 
   return (
@@ -724,7 +733,7 @@ function DayView({
           ))}
 
           {/* Línea "ahora" */}
-          {isCurrentDay && minsSince7 >= 0 && minsSince7 <= 14 * 60 && (
+          {isCurrentDay && now.getHours() >= dayMinH && now.getHours() <= dayMaxH && (
             <div
               className="absolute left-0 right-0 flex items-center pointer-events-none z-20"
               style={{ top: minsSince7 }}

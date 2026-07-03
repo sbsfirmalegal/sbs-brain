@@ -38,6 +38,7 @@ export function EventModal({ initialDate, initialTime, event, onClose }: Props) 
   const [confirmDelete, setConfirmDelete] = useState(false);
 
   const isEdit = !!event;
+  const isOwner = !event || event.owner === currentUser;
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -277,7 +278,7 @@ export function EventModal({ initialDate, initialTime, event, onClose }: Props) 
 
           {/* Acciones */}
           <div className="flex items-center justify-between gap-3 pt-4 border-t border-[var(--border)]">
-            {isEdit ? (
+            {isEdit && isOwner ? (
               <button
                 onClick={handleDelete}
                 className={`flex items-center gap-1.5 text-sm rounded-xl px-3 py-2 transition-all ${
@@ -290,7 +291,9 @@ export function EventModal({ initialDate, initialTime, event, onClose }: Props) 
                 {confirmDelete ? "¿Confirmar eliminación?" : "Eliminar"}
               </button>
             ) : (
-              <span className="text-xs text-[var(--text-faint)]">Enter para guardar</span>
+              <span className="text-xs text-[var(--text-faint)]">
+                {isEdit && !isOwner ? "Solo el creador puede editar" : "Enter para guardar"}
+              </span>
             )}
 
             <div className="flex gap-2">
@@ -298,16 +301,18 @@ export function EventModal({ initialDate, initialTime, event, onClose }: Props) 
                 onClick={onClose}
                 className="rounded-xl border border-[var(--border)] px-4 py-2 text-sm text-[var(--text-dim)] hover:border-[var(--border-strong)]"
               >
-                Cancelar
+                {isEdit && !isOwner ? "Cerrar" : "Cancelar"}
               </button>
-              <button
-                onClick={save}
-                disabled={!title.trim() || !date || saving}
-                className="rounded-xl px-5 py-2 text-sm font-semibold disabled:opacity-40 transition-opacity"
-                style={{ background: "var(--color-dorado)", color: "#0A1828" }}
-              >
-                {saving ? "Guardando…" : isEdit ? "Guardar cambios" : "Crear evento"}
-              </button>
+              {(!isEdit || isOwner) && (
+                <button
+                  onClick={save}
+                  disabled={!title.trim() || !date || saving}
+                  className="rounded-xl px-5 py-2 text-sm font-semibold disabled:opacity-40 transition-opacity"
+                  style={{ background: "var(--color-dorado)", color: "#0A1828" }}
+                >
+                  {saving ? "Guardando…" : isEdit ? "Guardar cambios" : "Crear evento"}
+                </button>
+              )}
             </div>
           </div>
         </motion.div>

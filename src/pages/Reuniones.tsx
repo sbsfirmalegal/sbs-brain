@@ -23,6 +23,7 @@ import type {
   Visibility,
 } from "../data/types";
 import { ALL_USERS, USER_LIST, USERS } from "../data/users";
+import { useDebouncedSave } from "../lib/useDebouncedSave";
 
 const MEETING_TYPE_LABEL: Record<MeetingType, string> = {
   ordinaria: "ordinaria",
@@ -173,6 +174,26 @@ function MeetingDetail({
   }
 
   const [minute, setMinute] = useState(meeting.minute);
+  const isEditingMinuteRef = useRef(false);
+  const editCooldownRef = useRef<ReturnType<typeof setTimeout>>();
+
+  // Sincronizar minuta con cambios remotos (Realtime) mientras no estamos escribiendo
+  useEffect(() => {
+    if (!isEditingMinuteRef.current) {
+      setMinute(meeting.minute);
+    }
+  }, [meeting.minute]);
+
+  const handleMinuteChange = (v: string) => {
+    isEditingMinuteRef.current = true;
+    clearTimeout(editCooldownRef.current);
+    // 700ms sin teclear = usuario dejó de editar; habilitar sync remoto
+    editCooldownRef.current = setTimeout(() => {
+      isEditingMinuteRef.current = false;
+    }, 700);
+    setMinute(v);
+  };
+
   useDebouncedSave(minute, meeting.minute, (v) => updateMeeting(meeting.id, { minute: v }));
 
   const canClose = meeting.minute.trim().length > 0 &&
@@ -222,7 +243,7 @@ function MeetingDetail({
         <Section icon={<Scale size={15} />} title="Minuta">
           <textarea
             value={minute}
-            onChange={(e) => setMinute(e.target.value)}
+            onChange={(e) => handleMinuteChange(e.target.value)}
             placeholder="Resumen de lo conversado…"
             rows={4}
             className="w-full rounded-xl border border-[var(--border)] bg-[var(--surface)] p-3 text-sm outline-none focus:border-[var(--border-strong)] resize-none"
@@ -539,26 +560,3 @@ function Section({
   );
 }
 
-/** Guarda `value` contra el store 600ms después de que el usuario deja de escribir,
- *  para no perder caracteres por la latencia de red en un campo controlado remotamente. */
-function useDebouncedSave(value: string, initial: string, save: (v: string) => void) {
-  const saveRef = useRef(save);
-  saveRef.current = save;
-  const lastSaved = useRef(initial);
-
-  useEffect(() => {
-    if (value === lastSaved.current) return;
-    const t = setTimeout(() => {
-      lastSaved.current = value;
-      saveRef.current(value);
-    }, 600);
-    return () => clearTimeout(t);
-  }, [value]);
-
-  useEffect(() => {
-    return () => {
-      if (value !== lastSaved.current) saveRef.current(value);
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-}
