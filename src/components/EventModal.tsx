@@ -5,6 +5,17 @@ import { useStore } from "../store/store";
 import type { CalEvent, EventCategory, EventKind, UserId, Visibility } from "../data/types";
 import { ALL_USERS, USER_LIST } from "../data/users";
 import { CATEGORIES } from "../lib/eventCategories";
+import { datesInRangeByWeekday } from "../lib/dates";
+
+const WEEKDAYS: { label: string; value: number }[] = [
+  { label: "L", value: 1 },
+  { label: "M", value: 2 },
+  { label: "X", value: 3 },
+  { label: "J", value: 4 },
+  { label: "V", value: 5 },
+  { label: "S", value: 6 },
+  { label: "D", value: 0 },
+];
 
 interface Props {
   /** Fecha ISO pre-cargada al crear */
@@ -36,9 +47,15 @@ export function EventModal({ initialDate, initialTime, event, onClose }: Props) 
   );
   const [saving, setSaving] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
+  const [repeatDays, setRepeatDays] = useState<number[]>([]);
+  const [repeatUntil, setRepeatUntil] = useState("");
 
   const isEdit = !!event;
   const isOwner = !event || event.owner === currentUser;
+
+  function toggleRepeatDay(v: number) {
+    setRepeatDays((d) => (d.includes(v) ? d.filter((x) => x !== v) : [...d, v]));
+  }
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -71,7 +88,15 @@ export function EventModal({ initialDate, initialTime, event, onClose }: Props) 
     if (isEdit) {
       await updateEvent(event.id, payload);
     } else {
-      await addEvent({ ...payload, owner: currentUser ?? "nelson" });
+      const dates =
+        repeatDays.length > 0 && repeatUntil
+          ? datesInRangeByWeekday(date, repeatUntil, repeatDays)
+          : [date];
+      await Promise.all(
+        dates.map((d) =>
+          addEvent({ ...payload, date: d, owner: currentUser ?? "nelson" })
+        )
+      );
     }
     setSaving(false);
     onClose();
@@ -203,6 +228,46 @@ export function EventModal({ initialDate, initialTime, event, onClose }: Props) 
               </>
             )}
           </div>
+
+          {/* Repetir en varios días (solo al crear) */}
+          {!isEdit && (
+            <div className="mb-4">
+              <div className="uppercase-label text-[var(--text-faint)] mb-2">
+                Repetir (opcional)
+              </div>
+              <div className="flex gap-1 mb-2">
+                {WEEKDAYS.map((w) => (
+                  <button
+                    key={w.value}
+                    type="button"
+                    onClick={() => toggleRepeatDay(w.value)}
+                    className={`w-8 h-8 rounded-lg border text-xs font-semibold transition-all ${
+                      repeatDays.includes(w.value)
+                        ? "border-[var(--color-dorado)] bg-[var(--color-dorado)]/10 text-[var(--color-dorado)]"
+                        : "border-[var(--border)] text-[var(--text-dim)] hover:border-[var(--border-strong)]"
+                    }`}
+                  >
+                    {w.label}
+                  </button>
+                ))}
+              </div>
+              {repeatDays.length > 0 && (
+                <input
+                  type="date"
+                  value={repeatUntil}
+                  onChange={(e) => setRepeatUntil(e.target.value)}
+                  min={date}
+                  placeholder="Repetir hasta…"
+                  className="w-full rounded-lg border border-[var(--border)] bg-[var(--surface-2)] px-3 py-2 text-sm"
+                />
+              )}
+              {repeatDays.length > 0 && repeatUntil && date && (
+                <p className="text-xs text-[var(--text-faint)] mt-1.5">
+                  Se crearán {datesInRangeByWeekday(date, repeatUntil, repeatDays).length} eventos, uno por cada día marcado.
+                </p>
+              )}
+            </div>
+          )}
 
           {/* Ubicación */}
           <input

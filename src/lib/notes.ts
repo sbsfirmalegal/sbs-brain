@@ -2,6 +2,11 @@ import { format, parseISO } from "date-fns";
 import { es } from "date-fns/locale";
 import type { Note, NoteType } from "../data/types";
 
+/** Quita etiquetas HTML del cuerpo enriquecido para búsqueda/preview en texto plano. */
+export function stripHtml(html: string): string {
+  return html.replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim();
+}
+
 export interface NoteFilters {
   text?: string;
   tag?: string | null;
@@ -17,7 +22,7 @@ export function filterNotes(notes: Note[], f: NoteFilters): Note[] {
       const q = f.text.toLowerCase();
       const hit =
         n.title.toLowerCase().includes(q) ||
-        n.body.toLowerCase().includes(q) ||
+        stripHtml(n.body).toLowerCase().includes(q) ||
         n.tags.some((t) => t.toLowerCase().includes(q));
       if (!hit) return false;
     }

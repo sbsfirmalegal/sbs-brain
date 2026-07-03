@@ -126,6 +126,45 @@ body {
   font-weight: 600;
 }
 
+/* Editor de texto enriquecido (notas) */
+.rte:empty:before {
+  content: attr(data-placeholder);
+  color: var(--text-faint);
+  pointer-events: none;
+}
+.rte h2 {
+  font-family: var(--font-serif);
+  font-size: 1.4rem;
+  font-weight: 600;
+  color: var(--text);
+  margin: 0.6em 0 0.3em;
+}
+.rte h3 {
+  font-family: var(--font-serif);
+  font-size: 1.15rem;
+  font-weight: 600;
+  color: var(--text);
+  margin: 0.5em 0 0.25em;
+}
+.rte p {
+  margin: 0 0 0.6em;
+}
+.rte ul,
+.rte ol {
+  margin: 0.4em 0 0.6em 1.4em;
+}
+.rte ul {
+  list-style: disc;
+}
+.rte ol {
+  list-style: decimal;
+}
+.rte b,
+.rte strong {
+  font-weight: 700;
+  color: var(--text);
+}
+
 @keyframes fadein {
   from {
     opacity: 0;

@@ -176,6 +176,7 @@ create table if not exists public.notes (
   tags text[] not null default '{}',
   type text not null default 'idea' check (type in ('idea','reflexion','minuta','aprendizaje','decision','lectura','proyecto_personal','reunion_interna','diario','ia_tecnologia')),
   sources jsonb not null default '[]'::jsonb,
+  attachments jsonb not null default '[]'::jsonb,
   pinned boolean not null default false,
   converted_to_kind text check (converted_to_kind in ('task','habit','goal','event')),
   converted_to_id uuid,
@@ -194,6 +195,7 @@ alter table public.notes add column if not exists goal_id uuid;
 alter table public.notes add column if not exists deleted_at timestamptz;
 alter table public.notes add column if not exists decision_meta jsonb;
 alter table public.notes add column if not exists application text;
+alter table public.notes add column if not exists attachments jsonb not null default '[]'::jsonb;
 
 alter table public.notes enable row level security;
 

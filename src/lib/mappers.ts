@@ -9,6 +9,7 @@ import type {
   Habit,
   Meeting,
   Note,
+  NoteAttachment,
   Notification,
   Source,
   Task,
@@ -147,6 +148,7 @@ export function rowToNote(r: any, m: ProfileMap): Note {
     tags: r.tags ?? [],
     type: r.type,
     sources: (r.sources ?? []) as Source[],
+    attachments: (r.attachments ?? []) as NoteAttachment[],
     pinned: r.pinned ?? false,
     convertedTo:
       r.converted_to_kind && r.converted_to_id
@@ -170,6 +172,7 @@ export function noteToRow(n: Partial<Note>, m: ProfileMap) {
   if (n.tags !== undefined) row.tags = n.tags;
   if (n.type !== undefined) row.type = n.type;
   if (n.sources !== undefined) row.sources = n.sources;
+  if (n.attachments !== undefined) row.attachments = n.attachments;
   if (n.pinned !== undefined) row.pinned = n.pinned;
   if (n.convertedTo !== undefined) {
     row.converted_to_kind = n.convertedTo?.kind ?? null;

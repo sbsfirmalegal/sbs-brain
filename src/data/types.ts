@@ -144,6 +144,16 @@ export interface DecisionMeta {
   resultadoReal?: string;
 }
 
+export type AttachmentKind = "image" | "audio";
+
+export interface NoteAttachment {
+  id: string;
+  kind: AttachmentKind;
+  url: string;
+  name?: string;
+  createdAt: string;
+}
+
 export interface Note {
   id: string;
   title: string;
@@ -153,6 +163,7 @@ export interface Note {
   tags: string[];
   type: NoteType;
   sources?: Source[];
+  attachments?: NoteAttachment[];
   pinned?: boolean;
   convertedTo?: ConvertedTo;
   goalId?: string;

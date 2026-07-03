@@ -23,14 +23,19 @@ import {
   Target,
   CalendarDays,
   ArrowRight,
+  Image as ImageIcon,
+  Mic,
+  Square as SquareIcon,
+  Paperclip,
 } from "lucide-react";
 import { useStore } from "../store/store";
 import { SectionTitle, VisibilityBadge, Chip } from "../components/ui";
+import { RichTextEditor } from "../components/RichTextEditor";
 import { USER_LIST } from "../data/users";
 import type { UserId } from "../data/types";
 import { fmtDay } from "../lib/dates";
-import { filterNotes, monthlyStats, unprocessedIdeas, allTags } from "../lib/notes";
-import type { ConvertibleKind, DecisionMeta, Note, NoteType, Source, SourceKind } from "../data/types";
+import { filterNotes, monthlyStats, unprocessedIdeas, allTags, stripHtml } from "../lib/notes";
+import type { ConvertibleKind, DecisionMeta, Note, NoteAttachment, NoteType, Source, SourceKind } from "../data/types";
 import { REFLEXION_TEMPLATE } from "../data/types";
 import {
   detectSourceKind,
@@ -38,6 +43,7 @@ import {
   hostname,
   youtubeId,
 } from "../lib/sources";
+import { uploadNoteAttachment, deleteNoteAttachment, pickAudioMime } from "../lib/attachments";
 import { useDebouncedSave } from "../lib/useDebouncedSave";
 
 const TYPE_META: Record<NoteType, { label: string; icon: typeof Lightbulb; color: string }> = {
@@ -254,7 +260,7 @@ export function Notas() {
                     {n.pinned && <Star size={12} className="text-[var(--color-dorado)] shrink-0" fill="currentColor" />}
                   </div>
                   <div className="text-xs text-[var(--text-faint)] truncate mt-0.5">
-                    {n.body || "Sin contenido"}
+                    {stripHtml(n.body) || "Sin contenido"}
                   </div>
                   <div className="flex items-center gap-2 mt-1.5">
                     <span className="uppercase-label text-[var(--text-faint)]">
@@ -432,21 +438,19 @@ function NoteEditor({
         className="w-full bg-transparent font-serif text-2xl outline-none mb-3"
         placeholder="Título…"
       />
-      {note.type === "reflexion" && !body.trim() && (
+      {note.type === "reflexion" && !stripHtml(body) && (
         <button
-          onClick={() => setBody(REFLEXION_TEMPLATE)}
+          onClick={() => setBody("<p>" + REFLEXION_TEMPLATE.replace(/\n/g, "<br>") + "</p>")}
           className="uppercase-label mb-2 rounded-md border border-[var(--border)] px-2 py-1 text-[var(--text-dim)] hover:border-[var(--color-dorado)] hover:text-[var(--color-dorado)]"
         >
           Usar plantilla de reflexión diaria
         </button>
       )}
-      <textarea
+      <RichTextEditor
         value={body}
-        onChange={(e) => isOwner && setBody(e.target.value)}
+        onChange={(html) => isOwner && setBody(html)}
         readOnly={!isOwner}
         placeholder={isOwner ? "Escribí tu idea o reflexión…" : ""}
-        rows={10}
-        className="w-full bg-transparent outline-none resize-none leading-relaxed text-[var(--text-dim)]"
       />
 
       {note.type === "decision" && (
@@ -542,6 +546,9 @@ function NoteEditor({
         )}
       </div>
 
+      {/* Adjuntos: imágenes y notas de voz */}
+      <AttachmentsSection note={note} onChange={onChange} />
+
       {/* Fuentes */}
       <SourcesSection note={note} onChange={onChange} />
     </div>
@@ -631,6 +638,153 @@ function ApplicationField({
         rows={2}
         className="w-full rounded-lg border border-[var(--border)] bg-[var(--surface-2)] px-3 py-2 text-sm outline-none resize-none"
       />
+    </div>
+  );
+}
+
+function AttachmentsSection({
+  note,
+  onChange,
+}: {
+  note: Note;
+  onChange: (p: Partial<Note>) => void;
+}) {
+  const attachments = note.attachments ?? [];
+  const [uploading, setUploading] = useState(false);
+  const [recording, setRecording] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const chunksRef = useRef<Blob[]>([]);
+
+  function add(att: NoteAttachment) {
+    onChange({ attachments: [...attachments, att] });
+  }
+
+  async function remove(att: NoteAttachment) {
+    onChange({ attachments: attachments.filter((a) => a.id !== att.id) });
+    deleteNoteAttachment(att.url);
+  }
+
+  async function handlePickImage(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    e.target.value = "";
+    if (!file) return;
+    setUploading(true);
+    const ext = file.name.split(".").pop() || "jpg";
+    const att = await uploadNoteAttachment(note.owner, note.id, file, "image", ext, file.name);
+    setUploading(false);
+    if (att) add(att);
+  }
+
+  async function startRecording() {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const mime = pickAudioMime();
+      const mr = new MediaRecorder(stream, mime ? { mimeType: mime } : undefined);
+      chunksRef.current = [];
+      mr.ondataavailable = (e) => {
+        if (e.data.size > 0) chunksRef.current.push(e.data);
+      };
+      mr.onstop = async () => {
+        stream.getTracks().forEach((t) => t.stop());
+        const blob = new Blob(chunksRef.current, { type: mr.mimeType || "audio/webm" });
+        const ext = blob.type.includes("mp4") ? "m4a" : "webm";
+        setUploading(true);
+        const att = await uploadNoteAttachment(note.owner, note.id, blob, "audio", ext);
+        setUploading(false);
+        if (att) add(att);
+      };
+      mr.start();
+      mediaRecorderRef.current = mr;
+      setRecording(true);
+    } catch (err) {
+      console.error("[attachments] no se pudo grabar audio:", err);
+    }
+  }
+
+  function stopRecording() {
+    mediaRecorderRef.current?.stop();
+    setRecording(false);
+  }
+
+  const images = attachments.filter((a) => a.kind === "image");
+  const audios = attachments.filter((a) => a.kind === "audio");
+
+  return (
+    <div className="mt-5 pt-5 border-t border-[var(--border)]">
+      <div className="flex items-center justify-between mb-3">
+        <div className="flex items-center gap-2 uppercase-label text-[var(--text-dim)]">
+          <Paperclip size={14} />
+          Adjuntos
+          {attachments.length > 0 && (
+            <span className="text-[var(--text-faint)] tnum">· {attachments.length}</span>
+          )}
+        </div>
+        <div className="flex items-center gap-3">
+          {uploading && (
+            <span className="uppercase-label text-[var(--text-faint)]">Subiendo…</span>
+          )}
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept="image/*"
+            onChange={handlePickImage}
+            className="hidden"
+          />
+          <button
+            onClick={() => fileInputRef.current?.click()}
+            disabled={uploading || recording}
+            className="uppercase-label flex items-center gap-1 text-[var(--text-faint)] hover:text-[var(--color-dorado)] disabled:opacity-40"
+          >
+            <ImageIcon size={13} />
+            Imagen
+          </button>
+          <button
+            onClick={recording ? stopRecording : startRecording}
+            disabled={uploading}
+            className={`uppercase-label flex items-center gap-1 disabled:opacity-40 ${
+              recording ? "text-[var(--color-rojo)]" : "text-[var(--text-faint)] hover:text-[var(--color-dorado)]"
+            }`}
+          >
+            {recording ? <SquareIcon size={13} /> : <Mic size={13} />}
+            {recording ? "Detener" : "Voz"}
+          </button>
+        </div>
+      </div>
+
+      {images.length > 0 && (
+        <div className="grid grid-cols-4 gap-2 mb-3">
+          {images.map((a) => (
+            <div key={a.id} className="group relative rounded-lg overflow-hidden border border-[var(--border)]">
+              <a href={a.url} target="_blank" rel="noreferrer">
+                <img src={a.url} alt={a.name ?? ""} className="w-full aspect-square object-cover" />
+              </a>
+              <button
+                onClick={() => remove(a)}
+                className="absolute top-1 right-1 rounded-full bg-black/60 text-white p-1 opacity-0 group-hover:opacity-100 transition-opacity"
+              >
+                <X size={11} />
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {audios.length > 0 && (
+        <div className="space-y-2">
+          {audios.map((a) => (
+            <div key={a.id} className="group flex items-center gap-2 rounded-xl border border-[var(--border)] bg-[var(--surface-2)] p-2">
+              <audio controls src={a.url} className="flex-1 h-9" />
+              <button
+                onClick={() => remove(a)}
+                className="text-[var(--text-faint)] hover:text-[var(--color-rojo)] opacity-0 group-hover:opacity-100 transition-opacity shrink-0"
+              >
+                <X size={14} />
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 }

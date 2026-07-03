@@ -6,12 +6,30 @@ import {
   isThisWeek,
   differenceInCalendarDays,
   parseISO,
+  eachDayOfInterval,
 } from "date-fns";
 import { es } from "date-fns/locale";
 
 export const todayISO = () => format(new Date(), "yyyy-MM-dd");
 
 export const iso = (d: Date) => format(d, "yyyy-MM-dd");
+
+/** Fechas ISO entre `start` y `until` (inclusive) cuyo día de semana está en `weekdays`
+ *  (0=domingo..6=sábado, igual que Date.getDay()). Tope de 120 fechas para evitar
+ *  ráfagas de inserts descontroladas. Si no hay match, devuelve solo `start`. */
+export function datesInRangeByWeekday(
+  start: string,
+  until: string,
+  weekdays: number[]
+): string[] {
+  const s = parseISO(start);
+  const e = parseISO(until);
+  if (e < s || weekdays.length === 0) return [start];
+  const matched = eachDayOfInterval({ start: s, end: e })
+    .filter((d) => weekdays.includes(d.getDay()))
+    .map(iso);
+  return matched.length ? matched.slice(0, 120) : [start];
+}
 
 export const relativeDays = (n: number) => {
   const d = new Date();
