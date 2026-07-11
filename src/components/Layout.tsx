@@ -185,7 +185,12 @@ export function Layout() {
       {/* Contenido */}
       <div className="flex-1 flex flex-col min-w-0">
         {/* Topbar */}
-        <header className="sticky top-0 z-30 flex items-center gap-3 px-4 md:px-8 py-4 border-b border-[var(--border)] bg-[var(--bg)]/85 backdrop-blur">
+        <header
+          className="sticky top-0 z-30 flex items-center gap-3 px-4 md:px-8 py-4 border-b border-[var(--border)] bg-[var(--bg)]/85 backdrop-blur"
+          style={{
+            paddingTop: "max(env(safe-area-inset-top, 0px), 1rem)",
+          }}
+        >
           <button
             onClick={() => setSearchOpen(true)}
             className="flex-1 flex items-center gap-3 rounded-xl border border-[var(--border)] bg-[var(--surface)] px-4 py-2.5 text-[var(--text-faint)] hover:border-[var(--border-strong)] transition-colors"
@@ -233,7 +238,12 @@ export function Layout() {
       </div>
 
       {/* Bottom nav móvil */}
-      <nav className="md:hidden fixed bottom-0 inset-x-0 z-30 flex justify-around border-t border-[var(--border)] bg-[var(--surface)]/95 backdrop-blur py-2">
+      <nav
+        className="md:hidden fixed bottom-0 inset-x-0 z-30 flex justify-around border-t border-[var(--border)] bg-[var(--surface)]/95 backdrop-blur py-2"
+        style={{
+          paddingBottom: "max(env(safe-area-inset-bottom, 0px), 0.5rem)",
+        }}
+      >
         {NAV.slice(0, 4).map((item) => (
           <NavLink
             key={item.to}

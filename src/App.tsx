@@ -1,12 +1,15 @@
+import { useEffect } from "react";
 import {
   BrowserRouter,
   Routes,
   Route,
   Navigate,
   Outlet,
+  useNavigate,
 } from "react-router-dom";
 import { AuthProvider, useAuth } from "./contexts/AuthContext";
 import { StoreProvider, useStore } from "./store/store";
+import { reRegisterPushForUser } from "./lib/native";
 import { Layout } from "./components/Layout";
 import { Login } from "./pages/Login";
 import { Hoy } from "./pages/Hoy";
@@ -50,9 +53,31 @@ function Protected() {
   const { profile, loading } = useAuth();
   const { currentUser } = useStore();
 
+  // Al confirmar sesion, reintenta el registro FCM para que el token del
+  // dispositivo quede ligado al usuario (setupPush inicial puede haber corrido
+  // antes de que la sesion estuviera lista).
+  useEffect(() => {
+    if (profile?.id) reRegisterPushForUser();
+  }, [profile?.id]);
+
   if (loading) return <AppLoading />;
   if (!profile || !currentUser) return <Navigate to="/login" replace />;
   return <Outlet />;
+}
+
+// Puente entre native.ts y react-router: al recibir "sbs-navigate" navega
+// dentro del SPA sin recarga.
+function NativeNavBridge() {
+  const nav = useNavigate();
+  useEffect(() => {
+    const onNav = (e: Event) => {
+      const detail = (e as CustomEvent).detail;
+      if (typeof detail === "string") nav(detail);
+    };
+    window.addEventListener("sbs-navigate", onNav);
+    return () => window.removeEventListener("sbs-navigate", onNav);
+  }, [nav]);
+  return null;
 }
 
 function AppRoutes() {
@@ -60,7 +85,9 @@ function AppRoutes() {
   if (loading) return <AppLoading />;
 
   return (
-    <Routes>
+    <>
+      <NativeNavBridge />
+      <Routes>
       <Route path="/login" element={<Login />} />
       <Route element={<Protected />}>
         <Route element={<Layout />}>
@@ -78,7 +105,8 @@ function AppRoutes() {
         </Route>
       </Route>
       <Route path="*" element={<Navigate to="/hoy" replace />} />
-    </Routes>
+      </Routes>
+    </>
   );
 }
 

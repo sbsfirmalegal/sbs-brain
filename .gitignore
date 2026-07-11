@@ -7,3 +7,19 @@ dist-ssr
 .env.*.local
 .DS_Store
 .vscode
+
+# Android / Capacitor build artifacts
+android/.gradle/
+android/**/build/
+android/local.properties
+android/app/release/
+android/app/debug/
+android/captures/
+android/.idea/
+
+# Credenciales sensibles (NUNCA subir al repo)
+*.keystore
+*.jks
+keystore.properties
+google-services.json
+firebase-service-account*.json
