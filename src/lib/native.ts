@@ -162,9 +162,31 @@ export async function reRegisterPushForUser() {
   }
 }
 
+/**
+ * Limpia cualquier Service Worker + Cache Storage que haya quedado activo de
+ * antes de este fix (versiones previas del APK sí lo registraban). Sin esto,
+ * el WebView seguiria sirviendo el bundle JS viejo desde el precache aunque
+ * el codigo actual ya no lo registre.
+ */
+async function purgeStaleServiceWorker() {
+  if (!("serviceWorker" in navigator)) return;
+  try {
+    const regs = await navigator.serviceWorker.getRegistrations();
+    await Promise.all(regs.map((r) => r.unregister()));
+    if ("caches" in window) {
+      const keys = await caches.keys();
+      await Promise.all(keys.map((k) => caches.delete(k)));
+    }
+  } catch (e) {
+    console.warn("[native] purga de service worker fallo:", e);
+  }
+}
+
 /** Punto de entrada unico, llamado desde main.tsx */
 export async function initNative() {
   if (!isNative()) return;
+
+  await purgeStaleServiceWorker();
 
   // Barra de estado NO overlay (evita que tape la topbar en Android 15+)
   try {

@@ -10,6 +10,11 @@ export default defineConfig({
     tailwindcss(),
     VitePWA({
       registerType: "autoUpdate",
+      // Registro manual (ver src/main.tsx): dentro del APK nativo el Service
+      // Worker NO se registra, porque su precache agresivo (skipWaiting +
+      // clients.claim) sirve el bundle JS viejo en el WebView remoto durante
+      // 1-2 reaperturas de la app cada vez que se hace un deploy nuevo.
+      injectRegister: false,
       strategies: "injectManifest",
       srcDir: "src",
       filename: "sw.ts",
