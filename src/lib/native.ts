@@ -47,6 +47,32 @@ async function syncStatusBarWithTheme() {
   }
 }
 
+// Cache del token FCM en memoria + sessionStorage. Necesario porque el evento
+// "registration" de Capacitor solo dispara una vez (la primera llamada a
+// register() con el token fresco); si el usuario aun no tenia sesion Supabase
+// en ese momento, el token se guarda aca y se flushea cuando llega el login.
+let cachedFcmToken: string | null = null;
+
+function readCachedToken(): string | null {
+  if (cachedFcmToken) return cachedFcmToken;
+  try {
+    const t = sessionStorage.getItem("fcm_token");
+    if (t) cachedFcmToken = t;
+    return cachedFcmToken;
+  } catch {
+    return null;
+  }
+}
+
+function writeCachedToken(t: string) {
+  cachedFcmToken = t;
+  try {
+    sessionStorage.setItem("fcm_token", t);
+  } catch {
+    /* ignore */
+  }
+}
+
 /** Guarda el token FCM del dispositivo en Supabase, ligado al usuario actual */
 async function saveDeviceToken(fcmToken: string) {
   const { data: sess } = await supabase.auth.getSession();
@@ -81,13 +107,12 @@ async function setupPush() {
     return;
   }
 
-  // 2. Registrar con FCM
-  await PushNotifications.register();
-
-  // 3. Listeners (se registran una sola vez, PushNotifications los acumula si se llama otra vez)
+  // 2. Listeners PRIMERO (orden critico: register() dispara "registration" casi
+  //    instantaneamente, si el listener no esta atado a tiempo se pierde el token)
   await PushNotifications.removeAllListeners();
 
   PushNotifications.addListener("registration", async (token: Token) => {
+    writeCachedToken(token.value);
     await saveDeviceToken(token.value);
   });
 
@@ -113,11 +138,23 @@ async function setupPush() {
       if (ruta) navigateInSpa(ruta);
     }
   );
+
+  // 3. Ahora si, disparar el registro. Los listeners ya estan atados; si el
+  //    token viene fresco disparara "registration" y lo cacheara + guardara.
+  await PushNotifications.register();
 }
 
-/** Reintentar registro cuando el usuario se loguea despues de arrancar */
+/** Reintentar registro cuando el usuario se loguea despues de arrancar.
+ *  Si ya tenemos el token en cache (porque llego antes del login), lo
+ *  guardamos directo en Supabase sin depender de que register() lo dispare
+ *  otra vez (Capacitor no siempre lo hace cuando el token esta cacheado). */
 export async function reRegisterPushForUser() {
   if (!isNative()) return;
+  const cached = readCachedToken();
+  if (cached) {
+    await saveDeviceToken(cached);
+    return;
+  }
   try {
     await PushNotifications.register();
   } catch (e) {
