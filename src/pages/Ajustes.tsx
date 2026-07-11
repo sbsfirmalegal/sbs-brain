@@ -19,6 +19,7 @@ import {
   unsubscribeFromPush,
   notificationPermission,
 } from "../lib/push";
+import { isNative } from "../lib/native";
 
 export function Ajustes() {
   const { currentUser, theme, toggleTheme } = useStore();
@@ -171,7 +172,13 @@ function PushToggle({ userUuid }: { userUuid: string | null }) {
         </div>
       </div>
 
-      {!supported ? (
+      {isNative() ? (
+        <p className="text-xs text-[var(--text-faint)]">
+          Activadas automáticamente en la app. No hace falta ningún ajuste
+          aquí — si no te llegan avisos, revisa el permiso de notificaciones
+          de la app en Ajustes del sistema Android.
+        </p>
+      ) : !supported ? (
         <p className="text-xs text-[var(--text-faint)]">
           Este navegador no soporta notificaciones push. Asegurate de abrir la
           app instalada en la pantalla de inicio.
